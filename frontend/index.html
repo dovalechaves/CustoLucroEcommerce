@@ -1,0 +1,1768 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ML Custo &amp; Lucro</title>
+  <style>
+    /* ── Reset & Variables ── */
+    *,
+    *::before,
+    *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --ml-yellow: #FFE600;
+      --ml-yellow-dark: #F0D900;
+      --ml-blue: #3483FA;
+      --ml-blue-dark: #2968C8;
+      --ml-dark: #1A1A2E;
+      --ml-gray: #F5F5F5;
+      --ml-gray2: #E5E5E5;
+      --ml-gray3: #999;
+      --ml-text: #333;
+      --ml-success: #00A650;
+      --ml-danger: #E02020;
+      --ml-warning: #FF7733;
+      --shadow: 0 2px 8px rgba(0, 0, 0, 0.10);
+      --shadow-lg: 0 4px 20px rgba(0, 0, 0, 0.15);
+      --radius: 8px;
+      --font: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    }
+
+    body {
+      font-family: var(--font);
+      background: var(--ml-gray);
+      color: var(--ml-text);
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    header {
+      background: var(--ml-yellow);
+      padding: 0 24px;
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: var(--shadow);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--ml-dark);
+    }
+
+    .header-brand span.icon {
+      font-size: 26px;
+    }
+
+    .header-user {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      font-size: 14px;
+      color: var(--ml-dark);
+    }
+
+    .btn-logout {
+      background: rgba(0, 0, 0, 0.1);
+      border: none;
+      padding: 6px 14px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--ml-dark);
+      transition: background 0.2s;
+    }
+
+    .btn-logout:hover {
+      background: rgba(0, 0, 0, 0.18);
+    }
+
+    /* ── Layout ── */
+    main {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 24px 16px;
+    }
+
+    /* ── Login Screen ── */
+    #login-screen {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - 56px);
+      gap: 32px;
+    }
+
+    .login-card {
+      background: #fff;
+      border-radius: 16px;
+      padding: 48px 40px;
+      box-shadow: var(--shadow-lg);
+      text-align: center;
+      max-width: 440px;
+      width: 100%;
+    }
+
+    .login-card .logo {
+      font-size: 56px;
+      margin-bottom: 16px;
+    }
+
+    .login-card h1 {
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 8px;
+      color: var(--ml-dark);
+    }
+
+    .login-card p {
+      color: var(--ml-gray3);
+      font-size: 15px;
+      margin-bottom: 32px;
+      line-height: 1.5;
+    }
+
+    .btn-primary {
+      background: var(--ml-blue);
+      color: #fff;
+      border: none;
+      padding: 14px 32px;
+      border-radius: var(--radius);
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      width: 100%;
+      transition: background 0.2s, transform 0.1s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .btn-primary:hover {
+      background: var(--ml-blue-dark);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:active {
+      transform: translateY(0);
+    }
+
+    .btn-secondary {
+      background: var(--ml-yellow);
+      color: var(--ml-dark);
+      border: none;
+      padding: 10px 20px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .btn-secondary:hover {
+      background: var(--ml-yellow-dark);
+    }
+
+    .btn-sm {
+      padding: 6px 14px;
+      font-size: 13px;
+      border-radius: 6px;
+    }
+
+    /* ── App Screen ── */
+    #app-screen {
+      display: none;
+    }
+
+    /* ── Cards ── */
+    .card {
+      background: #fff;
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .card-title {
+      font-size: 16px;
+      font-weight: 700;
+      margin-bottom: 16px;
+      color: var(--ml-dark);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    /* ── Filters ── */
+    .filters-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: flex-end;
+    }
+
+    .filter-group {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      min-width: 160px;
+    }
+
+    .filter-group label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ml-gray3);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    .filter-group select,
+    .filter-group input {
+      border: 1.5px solid var(--ml-gray2);
+      border-radius: 6px;
+      padding: 8px 10px;
+      font-size: 14px;
+      color: var(--ml-text);
+      background: #fff;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .filter-group select:focus,
+    .filter-group input:focus {
+      border-color: var(--ml-blue);
+    }
+
+    /* ── Summary Cards ── */
+    .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+      margin-bottom: 20px;
+    }
+
+    .summary-card {
+      background: #fff;
+      border-radius: var(--radius);
+      padding: 16px 20px;
+      box-shadow: var(--shadow);
+      text-align: center;
+    }
+
+    .summary-card .label {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--ml-gray3);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin-bottom: 6px;
+    }
+
+    .summary-card .value {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--ml-dark);
+    }
+
+    .summary-card.positive .value {
+      color: var(--ml-success);
+    }
+
+    .summary-card.negative .value {
+      color: var(--ml-danger);
+    }
+
+    .summary-card.accent .value {
+      color: var(--ml-blue);
+    }
+
+    /* ── Table ── */
+    .table-wrapper {
+      overflow-x: auto;
+      border-radius: var(--radius);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+
+    thead th {
+      background: var(--ml-dark);
+      color: #fff;
+      padding: 12px 10px;
+      text-align: left;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+    }
+
+    thead th:first-child {
+      border-radius: 8px 0 0 0;
+    }
+
+    thead th:last-child {
+      border-radius: 0 8px 0 0;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--ml-gray2);
+      transition: background 0.15s;
+      cursor: pointer;
+    }
+
+    tbody tr:hover {
+      background: #F0F7FF;
+    }
+
+    tbody td {
+      padding: 11px 10px;
+      vertical-align: middle;
+    }
+
+    tbody td.number {
+      text-align: right;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .profit-positive {
+      color: var(--ml-success);
+      font-weight: 700;
+    }
+
+    .profit-negative {
+      color: var(--ml-danger);
+      font-weight: 700;
+    }
+
+    tfoot td {
+      padding: 12px 10px;
+      font-weight: 700;
+      background: #F8F9FA;
+      border-top: 2px solid var(--ml-gray2);
+      font-variant-numeric: tabular-nums;
+    }
+
+    tfoot td.number {
+      text-align: right;
+    }
+
+    /* Editable cost input */
+    .cost-input {
+      width: 80px;
+      border: 1.5px solid var(--ml-gray2);
+      border-radius: 4px;
+      padding: 4px 6px;
+      font-size: 13px;
+      text-align: right;
+      outline: none;
+    }
+
+    .cost-input:focus {
+      border-color: var(--ml-blue);
+    }
+
+    /* ── Badge ── */
+    .badge {
+      display: inline-block;
+      padding: 3px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .badge-paid {
+      background: #D4F5E2;
+      color: #006830;
+    }
+
+    .badge-pending {
+      background: #FFF3D4;
+      color: #7A5200;
+    }
+
+    .badge-cancelled {
+      background: #FFE0E0;
+      color: #9B0000;
+    }
+
+    .badge-default {
+      background: var(--ml-gray2);
+      color: var(--ml-gray3);
+    }
+
+    /* ── Tabs ── */
+    .tabs {
+      display: flex;
+      gap: 4px;
+      border-bottom: 2px solid var(--ml-gray2);
+      margin-bottom: 20px;
+    }
+
+    .tab-btn {
+      background: none;
+      border: none;
+      padding: 10px 20px;
+      font-size: 14px;
+      font-weight: 600;
+      color: var(--ml-gray3);
+      cursor: pointer;
+      border-bottom: 3px solid transparent;
+      margin-bottom: -2px;
+      transition: color 0.2s, border-color 0.2s;
+    }
+
+    .tab-btn.active {
+      color: var(--ml-blue);
+      border-bottom-color: var(--ml-blue);
+    }
+
+    .tab-content {
+      display: none;
+    }
+
+    .tab-content.active {
+      display: block;
+    }
+
+    /* ── Modal ── */
+    .modal-overlay {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+
+    .modal-overlay.open {
+      display: flex;
+    }
+
+    .modal {
+      background: #fff;
+      border-radius: 12px;
+      padding: 28px;
+      max-width: 640px;
+      width: 100%;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow-lg);
+      position: relative;
+    }
+
+    .modal-close {
+      position: absolute;
+      top: 16px;
+      right: 16px;
+      background: none;
+      border: none;
+      font-size: 22px;
+      cursor: pointer;
+      color: var(--ml-gray3);
+      line-height: 1;
+    }
+
+    .modal-close:hover {
+      color: var(--ml-text);
+    }
+
+    .modal h2 {
+      font-size: 18px;
+      font-weight: 700;
+      margin-bottom: 20px;
+      color: var(--ml-dark);
+      padding-right: 30px;
+    }
+
+    .detail-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+
+    .detail-item {
+      padding: 12px;
+      background: var(--ml-gray);
+      border-radius: 6px;
+    }
+
+    .detail-item .dl {
+      font-size: 11px;
+      color: var(--ml-gray3);
+      font-weight: 600;
+      text-transform: uppercase;
+    }
+
+    .detail-item .dd {
+      font-size: 15px;
+      font-weight: 700;
+      margin-top: 2px;
+      color: var(--ml-dark);
+    }
+
+    .detail-item .dd.positive {
+      color: var(--ml-success);
+    }
+
+    .detail-item .dd.negative {
+      color: var(--ml-danger);
+    }
+
+    .breakdown-bar {
+      margin-top: 20px;
+    }
+
+    .breakdown-bar h3 {
+      font-size: 14px;
+      margin-bottom: 10px;
+      color: var(--ml-dark);
+    }
+
+    .breakdown-row {
+      display: flex;
+      justify-content: space-between;
+      padding: 8px 0;
+      border-bottom: 1px solid var(--ml-gray2);
+      font-size: 14px;
+    }
+
+    .breakdown-row:last-child {
+      border-bottom: none;
+      font-weight: 700;
+    }
+
+    .breakdown-row .neg {
+      color: var(--ml-danger);
+    }
+
+    .breakdown-row .pos {
+      color: var(--ml-success);
+    }
+
+    /* ── Simulator ── */
+    .sim-form {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+    }
+
+    .form-group {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .form-group label {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--ml-gray3);
+      text-transform: uppercase;
+    }
+
+    .form-group input,
+    .form-group select {
+      border: 1.5px solid var(--ml-gray2);
+      border-radius: 6px;
+      padding: 10px 12px;
+      font-size: 14px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .form-group input:focus,
+    .form-group select:focus {
+      border-color: var(--ml-blue);
+    }
+
+    .sim-result {
+      margin-top: 24px;
+      padding: 20px;
+      background: var(--ml-gray);
+      border-radius: var(--radius);
+      display: none;
+    }
+
+    .sim-result.show {
+      display: block;
+    }
+
+    .sim-result h3 {
+      font-size: 15px;
+      font-weight: 700;
+      margin-bottom: 14px;
+      color: var(--ml-dark);
+    }
+
+    .progress-bar-wrap {
+      background: var(--ml-gray2);
+      border-radius: 20px;
+      height: 18px;
+      overflow: hidden;
+      margin-bottom: 16px;
+      display: flex;
+    }
+
+    .progress-segment {
+      height: 100%;
+      transition: width 0.6s ease;
+    }
+
+    .seg-fee {
+      background: #FF7733;
+    }
+
+    .seg-shipping {
+      background: #7B61FF;
+    }
+
+    .seg-tax {
+      background: #FFB800;
+    }
+
+    .seg-cost {
+      background: #E02020;
+    }
+
+    .seg-profit {
+      background: var(--ml-success);
+    }
+
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-bottom: 12px;
+      font-size: 12px;
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .legend-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    /* ── Pagination ── */
+    .pagination {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 8px;
+      margin-top: 16px;
+    }
+
+    .page-btn {
+      background: #fff;
+      border: 1.5px solid var(--ml-gray2);
+      border-radius: 6px;
+      padding: 6px 14px;
+      font-size: 13px;
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--ml-blue);
+      transition: all 0.2s;
+    }
+
+    .page-btn:hover:not(:disabled) {
+      background: var(--ml-blue);
+      color: #fff;
+      border-color: var(--ml-blue);
+    }
+
+    .page-btn:disabled {
+      color: var(--ml-gray3);
+      cursor: default;
+    }
+
+    .page-btn.current {
+      background: var(--ml-blue);
+      color: #fff;
+      border-color: var(--ml-blue);
+    }
+
+    /* ── Loading ── */
+    .spinner {
+      display: inline-block;
+      width: 18px;
+      height: 18px;
+      border: 3px solid var(--ml-gray2);
+      border-top-color: var(--ml-blue);
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      vertical-align: middle;
+      margin-right: 8px;
+    }
+
+    @keyframes spin {
+      to {
+        transform: rotate(360deg);
+      }
+    }
+
+    .loading-row td {
+      text-align: center;
+      padding: 40px;
+      color: var(--ml-gray3);
+    }
+
+    /* ── Alerts ── */
+    .alert {
+      padding: 12px 16px;
+      border-radius: var(--radius);
+      font-size: 14px;
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .alert-warning {
+      background: #FFF8E1;
+      border: 1px solid #FFE082;
+      color: #7A5200;
+    }
+
+    .alert-error {
+      background: #FFEBEE;
+      border: 1px solid #EF9A9A;
+      color: #9B0000;
+    }
+
+    .alert-success {
+      background: #E8F5E9;
+      border: 1px solid #A5D6A7;
+      color: #1B5E20;
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 768px) {
+      .detail-grid {
+        grid-template-columns: 1fr;
+      }
+
+      .sim-form {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      header {
+        padding: 0 12px;
+      }
+
+      main {
+        padding: 12px 8px;
+      }
+    }
+
+    @media (max-width: 480px) {
+      .sim-form {
+        grid-template-columns: 1fr;
+      }
+
+      .login-card {
+        padding: 32px 20px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- ════════════════════════════════════════════════════════════════
+     HEADER
+════════════════════════════════════════════════════════════════ -->
+  <header>
+    <div class="header-brand">
+      <span class="icon">🛒</span>
+      ML Custo &amp; Lucro
+    </div>
+    <div class="header-user" id="header-user" style="display:none">
+      <span id="user-greeting">Olá!</span>
+      <button class="btn-logout" onclick="logout()">Sair</button>
+    </div>
+  </header>
+
+  <!-- ════════════════════════════════════════════════════════════════
+     LOGIN SCREEN
+════════════════════════════════════════════════════════════════ -->
+  <div id="login-screen">
+    <div class="login-card">
+      <div class="logo">🛒</div>
+      <h1>ML Custo &amp; Lucro</h1>
+      <p>Analise seus pedidos do Mercado Livre e calcule custo, taxas e lucro de cada venda em tempo real.</p>
+
+      <!-- Token direto -->
+      <div style="margin-bottom:16px;text-align:left">
+        <label
+          style="font-size:12px;font-weight:600;color:var(--ml-gray3);text-transform:uppercase;letter-spacing:.5px;display:block;margin-bottom:6px">
+          Cole seu Access Token
+        </label>
+        <textarea id="token-input" rows="3" placeholder="APP_USR-XXXXXXXX..."
+          style="width:100%;border:1.5px solid var(--ml-gray2);border-radius:6px;padding:10px;font-size:13px;font-family:monospace;resize:vertical;outline:none;transition:border-color .2s"
+          onfocus="this.style.borderColor='var(--ml-blue)'"
+          onblur="this.style.borderColor='var(--ml-gray2)'"></textarea>
+      </div>
+      <button class="btn-primary" onclick="loginWithToken()">
+        <span>🔑</span> Entrar com Token
+      </button>
+
+      <div id="login-error" style="display:none;margin-top:14px" class="alert alert-error"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+     APP SCREEN
+════════════════════════════════════════════════════════════════ -->
+  <div id="app-screen">
+    <main>
+
+      <!-- Tabs -->
+      <div class="tabs">
+        <button class="tab-btn active" onclick="switchTab('orders')">📦 Pedidos</button>
+        <button class="tab-btn" onclick="switchTab('simulator')">🧮 Simulador</button>
+      </div>
+
+      <!-- ── ORDERS TAB ── -->
+      <div class="tab-content active" id="tab-orders">
+
+        <!-- Filters -->
+        <div class="card">
+          <div class="card-title">🔍 Filtros</div>
+          <div class="filters-row">
+            <div class="filter-group">
+              <label>De</label>
+              <input type="date" id="f-date-from" />
+            </div>
+            <div class="filter-group">
+              <label>Até</label>
+              <input type="date" id="f-date-to" />
+            </div>
+            <div class="filter-group">
+              <label>Status</label>
+              <select id="f-status">
+                <option value="all">Todos</option>
+                <option value="paid">Pagos</option>
+                <option value="pending">Pendentes</option>
+                <option value="cancelled">Cancelados</option>
+              </select>
+            </div>
+            <div class="filter-group">
+              <label>Regime Tributário</label>
+              <select id="f-tax-regime" onchange="recalcAllRows()">
+                <option value="simples">Simples Nacional (~6%)</option>
+                <option value="mei">MEI (~3%)</option>
+                <option value="presumido">Lucro Presumido (~8%)</option>
+              </select>
+            </div>
+            <div class="filter-group" style="justify-content:flex-end">
+              <label>&nbsp;</label>
+              <button class="btn-primary btn-sm" onclick="loadOrders(0)">
+                🔎 Buscar
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Summary -->
+        <div class="summary-grid" id="summary-grid">
+          <div class="summary-card">
+            <div class="label">Total Receita</div>
+            <div class="value" id="s-revenue">R$ 0,00</div>
+          </div>
+          <div class="summary-card">
+            <div class="label">Total Taxas ML</div>
+            <div class="value" id="s-fees">R$ 0,00</div>
+          </div>
+          <div class="summary-card">
+            <div class="label">Total Custos Prod.</div>
+            <div class="value" id="s-costs">R$ 0,00</div>
+          </div>
+          <div class="summary-card">
+            <div class="label">Total Frete</div>
+            <div class="value" id="s-shipping">R$ 0,00</div>
+          </div>
+          <div class="summary-card">
+            <div class="label">Total Impostos</div>
+            <div class="value" id="s-taxes">R$ 0,00</div>
+          </div>
+          <div class="summary-card positive">
+            <div class="label">Lucro Total</div>
+            <div class="value" id="s-profit">R$ 0,00</div>
+          </div>
+          <div class="summary-card accent">
+            <div class="label">Margem Média</div>
+            <div class="value" id="s-margin">0,0%</div>
+          </div>
+        </div>
+
+        <!-- Orders Table -->
+        <div class="card">
+          <div class="table-wrapper">
+            <table id="orders-table">
+              <thead>
+                <tr>
+                  <th>Data</th>
+                  <th>Produto</th>
+                  <th>Qtd</th>
+                  <th>Status</th>
+                  <th class="number">Preço Venda</th>
+                  <th class="number">Taxa ML</th>
+                  <th class="number">Custo Produto</th>
+                  <th class="number">Frete</th>
+                  <th class="number">Imposto</th>
+                  <th class="number">Lucro</th>
+                  <th class="number">Margem%</th>
+                  <th></th>
+                </tr>
+              </thead>
+              <tbody id="orders-tbody">
+                <tr class="loading-row">
+                  <td colspan="12" style="text-align:center;padding:40px;color:#999">
+                    Use os filtros acima e clique em Buscar para carregar os pedidos.
+                  </td>
+                </tr>
+              </tbody>
+              <tfoot id="orders-tfoot">
+              </tfoot>
+            </table>
+          </div>
+
+          <!-- Pagination -->
+          <div class="pagination" id="pagination"></div>
+        </div>
+
+      </div><!-- /tab-orders -->
+
+      <!-- ── SIMULATOR TAB ── -->
+      <div class="tab-content" id="tab-simulator">
+        <div class="card">
+          <div class="card-title">🧮 Simulador de Lucro</div>
+          <p style="font-size:13px;color:var(--ml-gray3);margin-bottom:20px">
+            Calcule o lucro estimado antes de precificar seu produto.
+          </p>
+
+          <div style="margin-bottom:20px;">
+            <button class="btn-secondary" style="width:100%;margin-bottom:12px" onclick="loadMyItems(event)">☁️ Importar
+              Meus Anúncios do Mercado Livre</button>
+            <select id="sim-my-items"
+              style="display:none;width:100%;border:1.5px solid var(--ml-gray2);border-radius:6px;padding:10px 12px;font-size:14px;outline:none;"
+              onchange="selectMyItem()">
+              <option value="">Selecione um anúncio para importar os dados...</option>
+            </select>
+          </div>
+
+          <div class="sim-form">
+            <div class="form-group">
+              <label>Preço de Venda (R$)</label>
+              <input type="number" id="sim-price" placeholder="0,00" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label>Quantidade</label>
+              <input type="number" id="sim-qty" value="1" min="1" step="1" />
+            </div>
+            <div class="form-group">
+              <label>Custo do Produto (R$)</label>
+              <input type="number" id="sim-cost" placeholder="0,00" min="0" step="0.01" />
+            </div>
+            <div class="form-group">
+              <label>Peso (gramas)</label>
+              <input type="number" id="sim-weight" placeholder="Ex: 500" min="0" step="1" value="500" />
+            </div>
+            <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px;">
+              <input type="checkbox" id="sim-free-shipping" checked />
+              <label for="sim-free-shipping" style="cursor: pointer; margin: 0; padding-top: 2px;">Oferecer Frete
+                Grátis</label>
+            </div>
+            <div class="form-group">
+              <label>Tipo de Anúncio</label>
+              <select id="sim-listing-type">
+                <option value="gold_premium">Premium (16%)</option>
+                <option value="gold_special" selected>Clássico (12%)</option>
+                <option value="free">Grátis (0%)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Regime Tributário</label>
+              <select id="sim-tax-regime">
+                <option value="simples">Simples Nacional (~6%)</option>
+                <option value="mei">MEI (~3%)</option>
+                <option value="presumido">Lucro Presumido (~8%)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Categoria (Produto Inédito)</label>
+              <input type="text" id="sim-category-id" placeholder="MLB1055" />
+            </div>
+            <div class="form-group">
+              <label>Item ID ML (opcional)</label>
+              <input type="text" id="sim-item-id" placeholder="MLB123456789" />
+            </div>
+          </div>
+
+          <div style="margin-top:20px">
+            <button class="btn-primary" style="max-width:220px" onclick="runSimulator()">
+              ▶ Calcular Lucro
+            </button>
+          </div>
+
+          <!-- Simulator Result -->
+          <div class="sim-result" id="sim-result">
+            <h3>📊 Resultado da Simulação</h3>
+
+            <div class="progress-bar-wrap" id="sim-bar"></div>
+            <div class="legend" id="sim-legend"></div>
+
+            <div class="breakdown-bar">
+              <div class="breakdown-row">
+                <span>💰 Receita Bruta</span>
+                <span class="pos" id="sr-revenue">—</span>
+              </div>
+              <div class="breakdown-row">
+                <span>🏪 Taxa ML (<span id="sr-fee-pct">—</span>%)</span>
+                <span class="neg" id="sr-fee">—</span>
+              </div>
+              <div class="breakdown-row">
+                <span>🚚 Custo de Frete</span>
+                <span class="neg" id="sr-shipping">—</span>
+              </div>
+              <div class="breakdown-row">
+                <span>🧾 Imposto (<span id="sr-tax-pct">—</span>%)</span>
+                <span class="neg" id="sr-tax">—</span>
+              </div>
+              <div class="breakdown-row">
+                <span>📦 Custo do Produto</span>
+                <span class="neg" id="sr-cost">—</span>
+              </div>
+              <div class="breakdown-row">
+                <span>✅ Lucro Líquido</span>
+                <span id="sr-profit">—</span>
+              </div>
+              <div class="breakdown-row">
+                <span>📈 Margem</span>
+                <span id="sr-margin">—</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div><!-- /tab-simulator -->
+
+    </main>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+     ORDER DETAIL MODAL
+════════════════════════════════════════════════════════════════ -->
+  <div class="modal-overlay" id="modal-overlay" onclick="closeModalOnOverlay(event)">
+    <div class="modal" id="modal-content">
+      <button class="modal-close" onclick="closeModal()">✕</button>
+      <h2 id="modal-title">Detalhes do Pedido</h2>
+      <div id="modal-body"></div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════════════
+     JAVASCRIPT
+════════════════════════════════════════════════════════════════ -->
+  <script>
+    // ── Config ────────────────────────────────────────────────────────────────────
+    const API_BASE = 'http://localhost:3001';
+
+    // ── State ─────────────────────────────────────────────────────────────────────
+    let sellerId = localStorage.getItem('ml_seller_id') || null;
+    let currentPage = 0;
+    const PAGE_SIZE = 50;
+    let ordersData = [];  // Processed rows with computed values
+
+    const TAX_RATES = { mei: 0.03, simples: 0.06, presumido: 0.08 };
+    const LISTING_RATES = {
+      free: 0, bronze: 0, silver: 0.08,
+      gold: 0.12, gold_special: 0.12,
+      gold_pro: 0.16, gold_premium: 0.16,
+      premium: 0.16, classic: 0.12
+    };
+
+    // ── Init ──────────────────────────────────────────────────────────────────────
+    (function init() {
+      const params = new URLSearchParams(window.location.search);
+      const urlSellerId = params.get('seller_id');
+      const error = params.get('error');
+
+      if (urlSellerId) {
+        sellerId = urlSellerId;
+        localStorage.setItem('ml_seller_id', sellerId);
+        // Clean URL
+        window.history.replaceState({}, '', window.location.pathname);
+      }
+
+      if (error === 'auth_failed') {
+        showAlert('Falha na autenticação com o Mercado Livre. Tente novamente.', 'error');
+      }
+
+      if (sellerId) {
+        showApp();
+      } else {
+        showLogin();
+      }
+
+      // Set default date range: last 30 days
+      const today = new Date();
+      const thirtyAgo = new Date();
+      thirtyAgo.setDate(today.getDate() - 30);
+      document.getElementById('f-date-to').value = toDateInput(today);
+      document.getElementById('f-date-from').value = toDateInput(thirtyAgo);
+    })();
+
+    // ── Auth ──────────────────────────────────────────────────────────────────────
+    async function loginWithToken() {
+      const token = document.getElementById('token-input').value.trim();
+      if (!token) {
+        showLoginError('Cole o access token antes de continuar.');
+        return;
+      }
+
+      const btn = event.currentTarget;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Validando...';
+
+      try {
+        const res = await fetch(`${API_BASE}/auth/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ access_token: token })
+        });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+
+        sellerId = String(data.seller_id);
+        localStorage.setItem('ml_seller_id', sellerId);
+        localStorage.setItem('ml_access_token', token);
+        await showApp();
+      } catch (e) {
+        showLoginError('Token inválido ou expirado: ' + e.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<span>🔑</span> Entrar com Token';
+      }
+    }
+
+    function showLoginError(msg) {
+      const el = document.getElementById('login-error');
+      el.textContent = '❌ ' + msg;
+      el.style.display = 'block';
+      setTimeout(() => el.style.display = 'none', 6000);
+    }
+
+    async function connectML() {
+      try {
+        const res = await fetch(`${API_BASE}/auth/url`);
+        const data = await res.json();
+        if (data.url) {
+          window.location.href = data.url;
+        } else {
+          showAlert('Não foi possível obter a URL de autorização. Verifique o .env do backend.', 'error');
+        }
+      } catch (e) {
+        showAlert('Erro ao conectar com o backend. Verifique se o servidor está rodando em localhost:3001', 'error');
+      }
+    }
+
+    function logout() {
+      localStorage.removeItem('ml_seller_id');
+      sellerId = null;
+      showLogin();
+    }
+
+    // ── Screen Switching ──────────────────────────────────────────────────────────
+    function showLogin() {
+      document.getElementById('login-screen').style.display = 'flex';
+      document.getElementById('app-screen').style.display = 'none';
+      document.getElementById('header-user').style.display = 'none';
+    }
+
+    async function showApp() {
+      document.getElementById('login-screen').style.display = 'none';
+      document.getElementById('app-screen').style.display = 'block';
+      document.getElementById('header-user').style.display = 'flex';
+      await loadUser();
+    }
+
+    async function loadUser() {
+      try {
+        const res = await apiFetch(`/api/user?seller_id=${sellerId}`);
+        const user = await res.json();
+        const name = user.first_name || user.nickname || 'Usuário';
+        document.getElementById('user-greeting').textContent = `Olá, ${name}!`;
+      } catch (e) {
+        document.getElementById('user-greeting').textContent = 'Usuário conectado';
+      }
+    }
+
+    // ── Tabs ──────────────────────────────────────────────────────────────────────
+    function switchTab(tab) {
+      document.querySelectorAll('.tab-btn').forEach((b, i) => {
+        b.classList.toggle('active', ['orders', 'simulator'][i] === tab);
+      });
+      document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+      document.getElementById(`tab-${tab}`).classList.add('active');
+    }
+
+    // ── Orders ────────────────────────────────────────────────────────────────────
+    async function loadOrders(offset = 0) {
+      const dateFrom = document.getElementById('f-date-from').value;
+      const dateTo = document.getElementById('f-date-to').value;
+      const status = document.getElementById('f-status').value;
+
+      const tbody = document.getElementById('orders-tbody');
+      tbody.innerHTML = `<tr class="loading-row"><td colspan="12"><span class="spinner"></span> Carregando pedidos...</td></tr>`;
+      document.getElementById('orders-tfoot').innerHTML = '';
+      document.getElementById('pagination').innerHTML = '';
+
+      const params = new URLSearchParams({
+        seller_id: sellerId,
+        limit: PAGE_SIZE,
+        offset
+      });
+      if (dateFrom) params.append('date_from', dateFrom);
+      if (dateTo) params.append('date_to', dateTo);
+      if (status && status !== 'all') params.append('status', status);
+
+      try {
+        const res = await apiFetch(`/api/orders?${params.toString()}`);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+
+        const results = data.results || [];
+        const total = data.paging?.total || results.length;
+
+        if (results.length === 0) {
+          tbody.innerHTML = `<tr class="loading-row"><td colspan="12">Nenhum pedido encontrado para os filtros selecionados.</td></tr>`;
+          resetSummary();
+          return;
+        }
+
+        ordersData = results.map(order => processOrder(order));
+        renderTable(ordersData);
+        renderSummary(ordersData);
+        renderPagination(offset, total);
+
+        currentPage = offset;
+      } catch (e) {
+        tbody.innerHTML = `<tr class="loading-row"><td colspan="12" style="color:var(--ml-danger)">Erro ao carregar pedidos: ${e.message}</td></tr>`;
+      }
+    }
+
+    function processOrder(order) {
+      const taxRegime = document.getElementById('f-tax-regime').value;
+      const taxRate = TAX_RATES[taxRegime] || TAX_RATES.simples;
+
+      const item = order.order_items?.[0] || {};
+      const price = item.unit_price || 0;
+      const qty = item.quantity || 1;
+      const grossRevenue = price * qty;
+
+      // ML fee from order data
+      let mlFeeAmount = 0;
+      if (order.fee_details && Array.isArray(order.fee_details)) {
+        mlFeeAmount = order.fee_details.reduce((acc, f) => acc + (f.amount || 0), 0);
+      } else {
+        // Fallback: use listing type rate
+        const listingTypeId = item.listing_type_id || 'gold_special';
+        const rate = LISTING_RATES[listingTypeId?.toLowerCase()] ?? 0.12;
+        mlFeeAmount = grossRevenue * rate;
+      }
+
+      // Shipping
+      const shippingCost = order.shipping?.cost || 0;
+
+      // Tax
+      const taxAmount = grossRevenue * taxRate;
+
+      // Product cost - user editable, default 0
+      const productCost = 0;
+
+      const netProfit = grossRevenue - mlFeeAmount - shippingCost - taxAmount - productCost;
+      const margin = grossRevenue > 0 ? (netProfit / grossRevenue) * 100 : 0;
+
+      return {
+        id: order.id,
+        date: order.date_created,
+        title: item.item?.title || `MLB${item.item?.id || ''}`,
+        qty,
+        status: order.status,
+        price,
+        grossRevenue,
+        mlFeeAmount,
+        shippingCost,
+        taxAmount,
+        taxRate,
+        productCost,
+        netProfit,
+        margin,
+        raw: order
+      };
+    }
+
+    function renderTable(rows) {
+      const tbody = document.getElementById('orders-tbody');
+      tbody.innerHTML = rows.map((r, idx) => `
+    <tr onclick="openOrderModal(${idx})">
+      <td>${formatDate(r.date)}</td>
+      <td style="max-width:200px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${escHtml(r.title)}">${escHtml(r.title)}</td>
+      <td>${r.qty}</td>
+      <td>${statusBadge(r.status)}</td>
+      <td class="number">${brl(r.grossRevenue)}</td>
+      <td class="number">${brl(r.mlFeeAmount)}</td>
+      <td class="number" onclick="event.stopPropagation()">
+        <input class="cost-input" type="number" min="0" step="0.01"
+          data-idx="${idx}"
+          value="${r.productCost.toFixed(2)}"
+          onchange="updateCost(${idx}, this.value)"
+          title="Informe o custo do produto" />
+      </td>
+      <td class="number">${brl(r.shippingCost)}</td>
+      <td class="number">${brl(r.taxAmount)}</td>
+      <td class="number ${r.netProfit >= 0 ? 'profit-positive' : 'profit-negative'}">${brl(r.netProfit)}</td>
+      <td class="number ${r.margin >= 0 ? 'profit-positive' : 'profit-negative'}">${r.margin.toFixed(1)}%</td>
+      <td><button class="btn-secondary btn-sm" onclick="event.stopPropagation();openOrderModal(${idx})">👁</button></td>
+    </tr>
+  `).join('');
+    }
+
+    function renderSummary(rows) {
+      const totalRevenue = rows.reduce((a, r) => a + r.grossRevenue, 0);
+      const totalFees = rows.reduce((a, r) => a + r.mlFeeAmount, 0);
+      const totalCosts = rows.reduce((a, r) => a + r.productCost, 0);
+      const totalShipping = rows.reduce((a, r) => a + r.shippingCost, 0);
+      const totalTaxes = rows.reduce((a, r) => a + r.taxAmount, 0);
+      const totalProfit = rows.reduce((a, r) => a + r.netProfit, 0);
+      const avgMargin = rows.length > 0 ? rows.reduce((a, r) => a + r.margin, 0) / rows.length : 0;
+
+      document.getElementById('s-revenue').textContent = brl(totalRevenue);
+      document.getElementById('s-fees').textContent = brl(totalFees);
+      document.getElementById('s-costs').textContent = brl(totalCosts);
+      document.getElementById('s-shipping').textContent = brl(totalShipping);
+      document.getElementById('s-taxes').textContent = brl(totalTaxes);
+      document.getElementById('s-profit').textContent = brl(totalProfit);
+      document.getElementById('s-profit').className = 'value ' + (totalProfit >= 0 ? '' : 'negative');
+      document.getElementById('s-margin').textContent = avgMargin.toFixed(1) + '%';
+
+      // Footer
+      const tfoot = document.getElementById('orders-tfoot');
+      tfoot.innerHTML = `
+    <tr>
+      <td colspan="4" style="font-weight:700">Totais (${rows.length} pedidos)</td>
+      <td class="number">${brl(totalRevenue)}</td>
+      <td class="number">${brl(totalFees)}</td>
+      <td class="number">${brl(totalCosts)}</td>
+      <td class="number">${brl(totalShipping)}</td>
+      <td class="number">${brl(totalTaxes)}</td>
+      <td class="number ${totalProfit >= 0 ? 'profit-positive' : 'profit-negative'}">${brl(totalProfit)}</td>
+      <td class="number ${avgMargin >= 0 ? 'profit-positive' : 'profit-negative'}">${avgMargin.toFixed(1)}%</td>
+      <td></td>
+    </tr>
+  `;
+    }
+
+    function resetSummary() {
+      ['s-revenue', 's-fees', 's-costs', 's-shipping', 's-taxes'].forEach(id => {
+        document.getElementById(id).textContent = 'R$ 0,00';
+      });
+      document.getElementById('s-profit').textContent = 'R$ 0,00';
+      document.getElementById('s-margin').textContent = '0,0%';
+    }
+
+    function updateCost(idx, value) {
+      const cost = parseFloat(value) || 0;
+      ordersData[idx].productCost = cost;
+
+      // Recalculate
+      const r = ordersData[idx];
+      r.netProfit = r.grossRevenue - r.mlFeeAmount - r.shippingCost - r.taxAmount - r.productCost;
+      r.margin = r.grossRevenue > 0 ? (r.netProfit / r.grossRevenue) * 100 : 0;
+
+      // Re-render just this row cells
+      const trs = document.getElementById('orders-tbody').querySelectorAll('tr');
+      const tr = trs[idx];
+      if (tr) {
+        const cells = tr.querySelectorAll('td');
+        cells[9].textContent = brl(r.netProfit);
+        cells[9].className = 'number ' + (r.netProfit >= 0 ? 'profit-positive' : 'profit-negative');
+        cells[10].textContent = r.margin.toFixed(1) + '%';
+        cells[10].className = 'number ' + (r.margin >= 0 ? 'profit-positive' : 'profit-negative');
+      }
+
+      renderSummary(ordersData);
+    }
+
+    function recalcAllRows() {
+      if (ordersData.length === 0) return;
+      const taxRegime = document.getElementById('f-tax-regime').value;
+      const taxRate = TAX_RATES[taxRegime] || TAX_RATES.simples;
+
+      ordersData = ordersData.map(r => {
+        r.taxRate = taxRate;
+        r.taxAmount = r.grossRevenue * taxRate;
+        r.netProfit = r.grossRevenue - r.mlFeeAmount - r.shippingCost - r.taxAmount - r.productCost;
+        r.margin = r.grossRevenue > 0 ? (r.netProfit / r.grossRevenue) * 100 : 0;
+        return r;
+      });
+
+      renderTable(ordersData);
+      renderSummary(ordersData);
+    }
+
+    function renderPagination(offset, total) {
+      const el = document.getElementById('pagination');
+      const totalPages = Math.ceil(total / PAGE_SIZE);
+      const currentPageNum = Math.floor(offset / PAGE_SIZE);
+
+      if (totalPages <= 1) { el.innerHTML = ''; return; }
+
+      let html = `<button class="page-btn" onclick="loadOrders(${(currentPageNum - 1) * PAGE_SIZE})" ${currentPageNum === 0 ? 'disabled' : ''}>← Ant</button>`;
+
+      const start = Math.max(0, currentPageNum - 2);
+      const end = Math.min(totalPages - 1, currentPageNum + 2);
+      for (let i = start; i <= end; i++) {
+        html += `<button class="page-btn ${i === currentPageNum ? 'current' : ''}" onclick="loadOrders(${i * PAGE_SIZE})">${i + 1}</button>`;
+      }
+
+      html += `<button class="page-btn" onclick="loadOrders(${(currentPageNum + 1) * PAGE_SIZE})" ${currentPageNum >= totalPages - 1 ? 'disabled' : ''}>Próx →</button>`;
+      html += `<span style="font-size:13px;color:var(--ml-gray3)">${total} pedido${total !== 1 ? 's' : ''} no total</span>`;
+
+      el.innerHTML = html;
+    }
+
+    // ── Order Detail Modal ────────────────────────────────────────────────────────
+    async function openOrderModal(idx) {
+      const r = ordersData[idx];
+      document.getElementById('modal-title').textContent = `Pedido #${r.id}`;
+      document.getElementById('modal-overlay').classList.add('open');
+
+      const body = document.getElementById('modal-body');
+      body.innerHTML = '<span class="spinner"></span> Carregando detalhes...';
+
+      try {
+        const res = await apiFetch(`/api/order/${r.id}?seller_id=${sellerId}`);
+        const order = await res.json();
+        renderOrderModal(r, order);
+      } catch (e) {
+        // Use data we already have
+        renderOrderModal(r, r.raw);
+      }
+    }
+
+    function renderOrderModal(r, order) {
+      const item = order.order_items?.[0] || {};
+      const buyer = order.buyer || {};
+      const shipping = order.shipping || {};
+
+      const mlFeePercent = r.grossRevenue > 0 ? (r.mlFeeAmount / r.grossRevenue * 100).toFixed(1) : '0.0';
+
+      document.getElementById('modal-body').innerHTML = `
+    <div class="detail-grid">
+      <div class="detail-item">
+        <div class="dl">Data do Pedido</div>
+        <div class="dd">${formatDateTime(r.date)}</div>
+      </div>
+      <div class="detail-item">
+        <div class="dl">Status</div>
+        <div class="dd">${statusBadge(r.status)}</div>
+      </div>
+      <div class="detail-item">
+        <div class="dl">Produto</div>
+        <div class="dd" style="font-size:13px">${escHtml(r.title)}</div>
+      </div>
+      <div class="detail-item">
+        <div class="dl">Comprador</div>
+        <div class="dd">${escHtml(buyer.nickname || buyer.first_name || 'N/D')}</div>
+      </div>
+      <div class="detail-item">
+        <div class="dl">Quantidade</div>
+        <div class="dd">${r.qty}</div>
+      </div>
+      <div class="detail-item">
+        <div class="dl">Preço Unitário</div>
+        <div class="dd">${brl(r.price)}</div>
+      </div>
+    </div>
+
+    <div class="breakdown-bar" style="margin-top:20px">
+      <h3>Breakdown Financeiro</h3>
+      <div class="breakdown-row">
+        <span>💰 Receita Bruta</span>
+        <span class="pos">${brl(r.grossRevenue)}</span>
+      </div>
+      <div class="breakdown-row">
+        <span>🏪 Taxa ML (${mlFeePercent}%)</span>
+        <span class="neg">− ${brl(r.mlFeeAmount)}</span>
+      </div>
+      <div class="breakdown-row">
+        <span>🚚 Frete (cobrado comprador)</span>
+        <span>${brl(shipping.cost || 0)}</span>
+      </div>
+      <div class="breakdown-row">
+        <span>🧾 Imposto (${(r.taxRate * 100).toFixed(0)}%)</span>
+        <span class="neg">− ${brl(r.taxAmount)}</span>
+      </div>
+      <div class="breakdown-row">
+        <span>📦 Custo do Produto (editável na tabela)</span>
+        <span class="neg">− ${brl(r.productCost)}</span>
+      </div>
+      <div class="breakdown-row">
+        <span>✅ Lucro Líquido</span>
+        <span class="${r.netProfit >= 0 ? 'pos' : 'neg'}">${brl(r.netProfit)}</span>
+      </div>
+      <div class="breakdown-row">
+        <span>📈 Margem</span>
+        <span class="${r.margin >= 0 ? 'pos' : 'neg'}">${r.margin.toFixed(1)}%</span>
+      </div>
+    </div>
+
+    ${shipping.id ? `
+    <div style="margin-top:16px;padding:12px;background:var(--ml-gray);border-radius:6px;font-size:13px">
+      <strong>Envio #${shipping.id}</strong> — Modo: ${shipping.shipment_type || 'N/D'} | Status: ${shipping.status || 'N/D'}
+    </div>` : ''}
+  `;
+    }
+
+    function closeModal() {
+      document.getElementById('modal-overlay').classList.remove('open');
+    }
+
+    function closeModalOnOverlay(e) {
+      if (e.target === document.getElementById('modal-overlay')) closeModal();
+    }
+
+    // ── Simulator ─────────────────────────────────────────────────────────────────
+    let myItemsList = [];
+
+    async function loadMyItems(event) {
+      const btn = event.currentTarget;
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Carregando anúncios...';
+
+      try {
+        const token = localStorage.getItem('ml_access_token');
+        const res = await fetch(`${API_BASE}/api/my-items?seller_id=${sellerId}`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        });
+        const data = await res.json();
+        myItemsList = data.items || [];
+
+        if (!myItemsList.length) {
+          showAlert('Nenhum anúncio ativo encontrado.', 'warning');
+          return;
+        }
+
+        const select = document.getElementById('sim-my-items');
+        select.innerHTML = '<option value="">Selecione um anúncio para importar os dados...</option>' +
+          myItemsList.map(item => `<option value="${item.id}">${item.id} - ${item.title} (R$ ${item.price})</option>`).join('');
+        select.style.display = 'block';
+      } catch (err) {
+        showAlert('Erro ao buscar anúncios: ' + err.message, 'error');
+      } finally {
+        btn.innerHTML = '☁️ Importar Meus Anúncios do Mercado Livre';
+        btn.disabled = false;
+      }
+    }
+
+    function selectMyItem() {
+      const id = document.getElementById('sim-my-items').value;
+      if (!id) return;
+      const item = myItemsList.find(i => i.id === id);
+      if (item) {
+        document.getElementById('sim-item-id').value = item.id;
+        document.getElementById('sim-category-id').value = item.category_id || '';
+        document.getElementById('sim-price').value = item.price || 0;
+
+        const lti = document.getElementById('sim-listing-type');
+        if (item.listing_type_id === 'gold_pro' || item.listing_type_id === 'gold_special' || item.listing_type_id === 'free') {
+          lti.value = item.listing_type_id;
+        }
+
+        showAlert('Dados do anúncio preenchidos automaticamente!', 'success');
+      }
+    }
+
+    async function runSimulator() {
+      const price = parseFloat(document.getElementById('sim-price').value) || 0;
+      const qty = parseInt(document.getElementById('sim-qty').value) || 1;
+      const cost = parseFloat(document.getElementById('sim-cost').value) || 0;
+      const weight = parseInt(document.getElementById('sim-weight').value) || 0;
+      const isFreeShipping = document.getElementById('sim-free-shipping').checked;
+      const listingTypeId = document.getElementById('sim-listing-type').value;
+      const taxRegime = document.getElementById('sim-tax-regime').value;
+      const categoryId = document.getElementById('sim-category-id').value.trim();
+      const itemId = document.getElementById('sim-item-id').value.trim();
+
+      if (!price) {
+        showAlert('Informe o preço de venda.', 'warning');
+        return;
+      }
+
+      const body = {
+        price,
+        quantity: qty,
+        cost,
+        weight,
+        free_shipping: isFreeShipping,
+        listing_type_id: listingTypeId,
+        tax_regime: taxRegime,
+        category_id: categoryId
+      };
+
+      if (sellerId && itemId) {
+        body.seller_id = sellerId;
+        body.item_id = itemId;
+      }
+
+      try {
+        const res = await fetch(`${API_BASE}/api/simulate`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        renderSimResult(data.results);
+      } catch (e) {
+        showAlert('Erro ao calcular simulação: ' + e.message, 'error');
+      }
+    }
+
+    function renderSimResult(r) {
+      const el = document.getElementById('sim-result');
+      el.classList.add('show');
+
+      document.getElementById('sr-revenue').textContent = brl(r.gross_revenue);
+      document.getElementById('sr-fee-pct').textContent = r.ml_fee_percent.toFixed(1);
+      document.getElementById('sr-fee').textContent = '− ' + brl(r.ml_fee_amount);
+      document.getElementById('sr-shipping').textContent = '− ' + brl(r.shipping_cost);
+      document.getElementById('sr-tax-pct').textContent = r.tax_rate_percent.toFixed(0);
+      document.getElementById('sr-tax').textContent = '− ' + brl(r.tax_amount);
+      document.getElementById('sr-cost').textContent = '− ' + brl(r.product_cost);
+
+      const profitEl = document.getElementById('sr-profit');
+      profitEl.textContent = brl(r.net_profit);
+      profitEl.className = r.net_profit >= 0 ? 'pos' : 'neg';
+
+      const marginEl = document.getElementById('sr-margin');
+      marginEl.textContent = r.margin_percent.toFixed(1) + '%';
+      marginEl.className = r.margin_percent >= 0 ? 'pos' : 'neg';
+
+      // Progress bar
+      const total = r.gross_revenue || 1;
+      const segments = [
+        { key: 'fee', label: 'Taxa ML', val: r.ml_fee_amount, cls: 'seg-fee' },
+        { key: 'ship', label: 'Frete', val: r.shipping_cost, cls: 'seg-shipping' },
+        { key: 'tax', label: 'Imposto', val: r.tax_amount, cls: 'seg-tax' },
+        { key: 'cost', label: 'Custo', val: r.product_cost, cls: 'seg-cost' },
+        { key: 'profit', label: 'Lucro', val: Math.max(r.net_profit, 0), cls: 'seg-profit' }
+      ];
+
+      document.getElementById('sim-bar').innerHTML = segments.map(s =>
+        `<div class="progress-segment ${s.cls}" style="width:${Math.max(0, (s.val / total) * 100).toFixed(1)}%"></div>`
+      ).join('');
+
+      document.getElementById('sim-legend').innerHTML = segments.map(s =>
+        `<div class="legend-item"><div class="legend-dot" style="background:var(--${s.cls.replace('seg-', '')}${s.cls === 'seg-fee' ? ':#FF7733' : s.cls === 'seg-shipping' ? ':#7B61FF' : s.cls === 'seg-tax' ? ':#FFB800' : s.cls === 'seg-cost' ? ':var(--ml-danger)' : ':var(--ml-success)'})"></div>
+    <span>${s.label}: ${brl(s.val)}</span></div>`
+      ).join('');
+
+      // Fix legend colors directly
+      const dots = document.getElementById('sim-legend').querySelectorAll('.legend-dot');
+      const colors = ['#FF7733', '#7B61FF', '#FFB800', '#E02020', '#00A650'];
+      dots.forEach((d, i) => d.style.background = colors[i]);
+    }
+
+    // ── Utilities ─────────────────────────────────────────────────────────────────
+    async function apiFetch(path, options = {}) {
+      return fetch(`${API_BASE}${path}`, options);
+    }
+
+    function brl(value) {
+      return new Intl.NumberFormat('pt-BR', {
+        style: 'currency',
+        currency: 'BRL'
+      }).format(value || 0);
+    }
+
+    function formatDate(iso) {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleDateString('pt-BR');
+    }
+
+    function formatDateTime(iso) {
+      if (!iso) return '—';
+      return new Date(iso).toLocaleString('pt-BR');
+    }
+
+    function toDateInput(d) {
+      return d.toISOString().split('T')[0];
+    }
+
+    function escHtml(str) {
+      if (!str) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    function statusBadge(status) {
+      const map = {
+        paid: ['badge-paid', 'Pago'],
+        pending: ['badge-pending', 'Pendente'],
+        cancelled: ['badge-cancelled', 'Cancelado'],
+        confirmed: ['badge-paid', 'Confirmado'],
+        payment_required: ['badge-pending', 'Aguard. Pagto'],
+        payment_in_process: ['badge-pending', 'Pagto em proc.']
+      };
+      const [cls, label] = map[status] || ['badge-default', status || '—'];
+      return `<span class="badge ${cls}">${label}</span>`;
+    }
+
+    function showAlert(msg, type = 'warning') {
+      const icons = { warning: '⚠️', error: '❌', success: '✅' };
+      const cls = `alert-${type}`;
+      const div = document.createElement('div');
+      div.className = `alert ${cls}`;
+      div.innerHTML = `${icons[type] || ''} ${escHtml(msg)}`;
+      const main = document.querySelector('main') || document.body;
+      main.prepend(div);
+      setTimeout(() => div.remove(), 6000);
+    }
+  </script>
+</body>
+
+</html>
