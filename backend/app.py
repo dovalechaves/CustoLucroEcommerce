@@ -148,10 +148,6 @@ def api_fees(item_id):
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
-@app.route('/api/wil',methods=['GET'])
-def oi():
-    return jsonify ({"message": "Willia viadinho"})
-
 @app.route('/api/simulate', methods=['POST'])
 def api_simulate():
     data = request.json or {}
