@@ -113,7 +113,8 @@ const ProductsTable = () => {
 
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
-  const [marginFilter, setMarginFilter] = useState<[number, number]>([0, 100]);
+  const [marginFilter, setMarginFilter] = useState<[number, number]>([-100, 100]);
+  const [editingCodigo, setEditingCodigo] = useState<string | null>(null);
 
   // Marketplace filter
   const [marketplace, setMarketplace] = useState<Marketplace>("mercadolivre");
@@ -131,15 +132,15 @@ const ProductsTable = () => {
       const taxa = recebimento * effectiveFeeRate;
 
       const frete =
-        marketplace === "mercadolivre" && recebimento >= 79
-          ? estimateShipping(recebimento, product.peso)
+        marketplace === "mercadolivre"
+          ? estimateShipping(product.precoFinal, product.peso || 500)
           : 0;
 
       const imposto = recebimento * TAX_RATE;
-      const recebimentoTotal = recebimento - taxa - frete;
-      const margem = recebimento > 0 ? ((recebimentoTotal - product.custo) / recebimento) * 100 : 0;
+      const recebimentoTotal = recebimento - taxa - frete - imposto - product.custo;
+      const margem = recebimento > 0 ? ((recebimento - taxa - frete - product.custo) / recebimento) * 100 : 0;
       const margemComImposto =
-        recebimento > 0 ? ((recebimentoTotal - product.custo - imposto) / recebimento) * 100 : 0;
+        recebimento > 0 ? (recebimentoTotal / recebimento) * 100 : 0;
 
       return { recebimento, taxa, frete, imposto, recebimentoTotal, margem, margemComImposto };
     },
@@ -156,6 +157,8 @@ const ProductsTable = () => {
 
   const filteredProducts = useMemo(() => {
     return products.filter((product) => {
+      if (product.codigo === editingCodigo) return true;
+
       const matchesSearch =
         product.codigo.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.descricao.toLowerCase().includes(searchQuery.toLowerCase());
@@ -166,7 +169,7 @@ const ProductsTable = () => {
 
       return matchesSearch && matchesMargin;
     });
-  }, [products, searchQuery, marginFilter, getCalculatedValues]);
+  }, [products, searchQuery, marginFilter, getCalculatedValues, editingCodigo]);
 
   const getMarginBadge = (margem: number) => {
     if (margem > 40) return <Badge className="bg-green-100 text-green-800">{margem.toFixed(1)}%</Badge>;
@@ -219,50 +222,7 @@ const ProductsTable = () => {
               </select>
               <ChevronIcon />
             </div>
-          </div>
-
-          {/* Slicer Margem c/ Imposto */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <label className={labelClass}>Margem c/ Imposto</label>
-              <span className="text-sm font-bold text-primary tabular-nums">
-                {marginFilter[0]}% — {marginFilter[1]}%
-              </span>
-            </div>
-            <div className="relative h-6 flex items-center">
-              <div className="absolute w-full h-2 bg-secondary rounded-full" />
-              <div
-                className="absolute h-2 bg-primary rounded-full"
-                style={{
-                  left: `${marginFilter[0]}%`,
-                  right: `${100 - marginFilter[1]}%`,
-                }}
-              />
-              <input
-                type="range" min="0" max="100" step="1"
-                value={marginFilter[0]}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  if (v <= marginFilter[1]) setMarginFilter([v, marginFilter[1]]);
-                }}
-                className="absolute w-full h-2 appearance-none bg-transparent cursor-pointer accent-primary [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:shadow-md"
-              />
-              <input
-                type="range" min="0" max="100" step="1"
-                value={marginFilter[1]}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  if (v >= marginFilter[0]) setMarginFilter([marginFilter[0], v]);
-                }}
-                className="absolute w-full h-2 appearance-none bg-transparent cursor-pointer accent-primary [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:shadow-md"
-              />
-            </div>
-            <div className="flex justify-between text-[10px] text-muted-foreground font-medium mt-1">
-              <span>0%</span>
-              <span>50%</span>
-              <span>100%</span>
-            </div>
-          </div>
+          </div> 
         </div>
 
 
@@ -315,6 +275,8 @@ const ProductsTable = () => {
                         min="0"
                         step="0.01"
                         value={product.precoFinal}
+                        onFocus={() => setEditingCodigo(product.codigo)}
+                        onBlur={() => setEditingCodigo(null)}
                         onChange={(e) => updateProduct(actualIndex, { precoFinal: parseFloat(e.target.value) || 0 })}
                         className="w-24 bg-secondary border-0 rounded px-2 py-1 text-sm text-right text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                       />
@@ -329,7 +291,7 @@ const ProductsTable = () => {
                     <td className="px-4 py-3 text-right font-bold text-foreground">{fmt(values.recebimentoTotal)}</td>
                     <td className="px-4 py-3 text-right text-muted-foreground">{values.margem.toFixed(1)}%</td>
                     <td className="px-4 py-3 text-right">{getMarginBadge(values.margemComImposto)}</td>
-                    <td className="px-4 py-3 text-right text-foreground">{(product.peso / 1000).toFixed(2)} kg</td>
+                    <td className="px-4 py-3 text-right text-foreground">{product.peso} g</td>
                   </tr>
                 );
               })}

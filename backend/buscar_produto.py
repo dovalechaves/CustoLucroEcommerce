@@ -26,9 +26,10 @@ def buscar_produtos_ecommerce():
             t4.tbp_custo              AS preco,
             pt.ptr_peso_embalagem     AS peso
         FROM produtos pro
-        INNER JOIN tabelas_produtos t1 ON t1.tbp_pro_codigo = pro.pro_codigo AND t1.tbp_tab_codigo = 1
-        INNER JOIN tabelas_produtos t4 ON t4.tbp_pro_codigo = pro.pro_codigo AND t4.tbp_tab_codigo = 4
-        INNER JOIN produtos_tray pt    ON pt.ptr_pro_codigo  = pro.pro_codigo
+        LEFT JOIN tabelas_produtos t1 ON t1.tbp_pro_codigo = pro.pro_codigo AND t1.tbp_tab_codigo = 1
+        LEFT JOIN tabelas_produtos t4 ON t4.tbp_pro_codigo = pro.pro_codigo AND t4.tbp_tab_codigo = 4
+        INNER JOIN produtos_tray pt   ON pt.ptr_pro_codigo  = pro.pro_codigo
+        WHERE t1.tbp_pro_codigo IS NOT NULL
     """
     return db.fetch_all(query)
 

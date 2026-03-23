@@ -201,8 +201,11 @@ def api_simulate():
 
     price = float(price)
 
-    TAX_RATES = {'mei': 0.03, 'simples': 0.06, 'presumido': 0.08}
-    tax_rate = TAX_RATES.get(tax_regime, 0.06)
+    if data.get('tax_rate') is not None:
+        tax_rate = float(data['tax_rate']) / 100
+    else:
+        TAX_RATES = {'mei': 0.03, 'simples': 0.06, 'presumido': 0.08}
+        tax_rate = TAX_RATES.get(tax_regime, 0.21)
     gross_revenue = price * quantity
 
     ml_fee_percent = get_fallback_rate(listing_type_id)

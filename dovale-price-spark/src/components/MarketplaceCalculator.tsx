@@ -3,7 +3,8 @@ import { fetchProduto, fetchTokenSalvo, authToken, simulate, fetchMyItems, type 
 
 type Marketplace = "" | "shopee" | "mercadolivre";
 type ListingType = "gold_pro" | "gold_special" | "free";
-type RegimeTributario = "mei" | "simples" | "presumido";
+
+const TAX_RATE = 0.21; // 21% fixo
 
 const MARKETPLACE_LABELS: Record<Marketplace, string> = {
   "": "Selecionar",
@@ -23,17 +24,6 @@ const LISTING_LABELS: Record<ListingType, string> = {
   free: "Grátis (0%)",
 };
 
-const REGIME_TAXES: Record<RegimeTributario, number> = {
-  mei: 3,
-  simples: 6,
-  presumido: 8,
-};
-
-const REGIME_LABELS: Record<RegimeTributario, string> = {
-  mei: "MEI (3%)",
-  simples: "Simples Nacional (6%)",
-  presumido: "Lucro Presumido (8%)",
-};
 
 const SHIPPING_TABLE_GREEN = [
   { max_weight: 0.3, costs: [5.65, 6.55, 7.75, 12.35, 14.35, 16.45, 18.45, 20.95] },
@@ -95,7 +85,6 @@ const MarketplaceCalculator = () => {
   const [codigoProduto, setCodigoProduto] = useState("");
   const [custoProduto, setCustoProduto] = useState("");
   const [taxaPlataforma, setTaxaPlataforma] = useState("");
-  const [impostos, setImpostos] = useState("");
   
   // New calculation states
   const [margemLucro, setMargemLucro] = useState(20);
@@ -112,7 +101,6 @@ const MarketplaceCalculator = () => {
 
   // ML-specific
   const [listingType, setListingType] = useState<ListingType>("gold_pro");
-  const [regimeTributario, setRegimeTributario] = useState<RegimeTributario>("presumido");
   const [pesoGramas, setPesoGramas] = useState("500");
 
   // Auth
@@ -133,7 +121,6 @@ const MarketplaceCalculator = () => {
 
   const isML = marketplace === "mercadolivre";
   const effectiveTaxa = isML ? LISTING_FEES[listingType] : parseFloat(taxaPlataforma) || 0;
-  const effectiveImpostos = isML ? REGIME_TAXES[regimeTributario] : parseFloat(impostos) || 0;
 
   // Auto-load ML token on mount
   useEffect(() => {
@@ -159,7 +146,7 @@ const MarketplaceCalculator = () => {
       const margin = value / 100;
       if (cost > 0 && margin < 1) {
         if (isML) {
-          const taxRate = REGIME_TAXES[regimeTributario] / 100;
+          const taxRate = TAX_RATE;
           const feeRate = LISTING_FEES[listingType] / 100;
           const denominator = 1 - margin - feeRate - taxRate;
           if (denominator > 0) {
@@ -186,8 +173,7 @@ const MarketplaceCalculator = () => {
           }
         } else {
           const taxRate = (parseFloat(taxaPlataforma) || 0) / 100;
-          const impostosRate = (parseFloat(impostos) || 0) / 100;
-          const denominator = 1 - margin - taxRate - impostosRate;
+          const denominator = 1 - margin - taxRate - TAX_RATE;
           if (denominator > 0) setPrecoVenda((cost / denominator).toFixed(2));
         }
       }
@@ -195,7 +181,7 @@ const MarketplaceCalculator = () => {
       const price = value;
       if (price > 0 && cost > 0) {
         if (isML) {
-          const taxRate = REGIME_TAXES[regimeTributario] / 100;
+          const taxRate = TAX_RATE;
           const feeRate = LISTING_FEES[listingType] / 100;
           let shipping = 0;
           if (price >= 79) shipping = estimateShipping(price, weight);
@@ -203,24 +189,23 @@ const MarketplaceCalculator = () => {
           setMargemLucro(Number(((profit / price) * 100).toFixed(2)));
         } else {
           const taxRate = (parseFloat(taxaPlataforma) || 0) / 100;
-          const impostosRate = (parseFloat(impostos) || 0) / 100;
-          const profit = price - cost - (price * taxRate) - (price * impostosRate);
+          const profit = price - cost - (price * taxRate) - (price * TAX_RATE);
           setMargemLucro(Number(((profit / price) * 100).toFixed(2)));
         }
       }
     }
-  }, [custoProduto, isML, regimeTributario, listingType, pesoGramas, taxaPlataforma, impostos]);
+  }, [custoProduto, isML, listingType, pesoGramas, taxaPlataforma]);
 
   // Keep values in sync when dependencies change
   useEffect(() => {
     syncValues(lastEdited, lastEdited === "margin" ? margemLucro : parseFloat(precoVenda) || 0);
-  }, [syncValues, lastEdited, margemLucro, precoVenda, custoProduto, pesoGramas, isML, listingType, regimeTributario, taxaPlataforma, impostos]);
+  }, [syncValues, lastEdited, margemLucro, precoVenda, custoProduto, pesoGramas, isML, listingType, taxaPlataforma]);
 
   // Reset simulation when inputs change
   useEffect(() => {
     setMlSim(null);
     setSimErro(null);
-  }, [marketplace, custoProduto, listingType, regimeTributario, pesoGramas, margemLucro, precoVenda, quantidade]);
+  }, [marketplace, custoProduto, listingType, pesoGramas, margemLucro, precoVenda, quantidade]);
 
   // Local calculation (always available)
   const results = useMemo(() => {
@@ -230,7 +215,7 @@ const MarketplaceCalculator = () => {
     let shipping = 0;
 
     if (isML) {
-      const taxRate = REGIME_TAXES[regimeTributario] / 100;
+      const taxRate = TAX_RATE;
       const feeRate = LISTING_FEES[listingType] / 100;
       if (price >= 79) {
         shipping = estimateShipping(price, parseInt(pesoGramas) || 0);
@@ -238,8 +223,7 @@ const MarketplaceCalculator = () => {
       profit = price - cost - shipping - (price * feeRate) - (price * taxRate);
     } else {
       const taxRate = (parseFloat(taxaPlataforma) || 0) / 100;
-      const impostosRate = (parseFloat(impostos) || 0) / 100;
-      profit = price - cost - (price * taxRate) - (price * impostosRate);
+      profit = price - cost - (price * taxRate) - (price * TAX_RATE);
     }
 
     return {
@@ -247,7 +231,7 @@ const MarketplaceCalculator = () => {
       lucroPorVenda: profit,
       frete: shipping,
     };
-  }, [precoVenda, custoProduto, taxaPlataforma, impostos, isML, listingType, regimeTributario, pesoGramas]);
+  }, [precoVenda, custoProduto, taxaPlataforma, isML, listingType, pesoGramas]);
 
   const buscarProduto = async () => {
     if (!codigoProduto.trim()) return;
@@ -325,7 +309,7 @@ const MarketplaceCalculator = () => {
         quantity: quantidade,
         listing_type_id: listingType,
         weight: parseInt(pesoGramas) || 500,
-        tax_regime: regimeTributario,
+        tax_rate: 21,
         free_shipping: (parseFloat(precoVenda) || 0) >= 79,
       };
 
@@ -392,21 +376,6 @@ const MarketplaceCalculator = () => {
                 </div>
               </div>
 
-              <div className="space-y-2 mb-6">
-                <label className={labelClass}>Regime Tributário</label>
-                <div className="relative">
-                  <select
-                    value={regimeTributario}
-                    onChange={(e) => setRegimeTributario(e.target.value as RegimeTributario)}
-                    className={selectClass}
-                  >
-                    {Object.entries(REGIME_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
-                  <ChevronIcon />
-                </div>
-              </div>
             </>
           ) : marketplace !== "" ? (
             <>
@@ -424,19 +393,6 @@ const MarketplaceCalculator = () => {
                 />
               </div>
 
-              <div className="space-y-2 mb-6">
-                <label className={labelClass}>Impostos (%)</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={impostos}
-                  onChange={(e) => setImpostos(e.target.value)}
-                  placeholder="0,00"
-                  className={inputClass}
-                />
-              </div>
             </>
           ) : null}
 
@@ -642,14 +598,14 @@ const MarketplaceCalculator = () => {
             {isML ? (
               <>
                 <ResultRow label="Tipo de Anúncio" value={LISTING_LABELS[listingType]} />
-                <ResultRow label="Regime Tributário" value={REGIME_LABELS[regimeTributario]} />
+                <ResultRow label="Imposto" value="21%" />
                 <ResultRow label="Peso" value={`${pesoGramas}g`} />
                 <ResultRow label="Custo de Frete (Estimado)" value={fmt(results.frete)} />
               </>
             ) : (
               <>
                 <ResultRow label="Taxa da Plataforma" value={`${effectiveTaxa}%`} />
-                <ResultRow label="Impostos" value={`${effectiveImpostos}%`} />
+                <ResultRow label="Imposto" value="21%" />
               </>
             )}
 
