@@ -1,20 +1,29 @@
 import os
-import fdb
+import sqlite3
 from dotenv import load_dotenv
 
 load_dotenv()
 
-class FirebirdManager:
+class DatabaseManager:
     def __init__(self):
-        self.host = os.environ.get('DATABASE_HOST', '192.168.10.37')
-        self.port = int(os.environ.get('DATABASE_PORT', 3050))
-        self.db_replica = os.environ.get('DATABASE_NAME', 'C:/Replicacao/SJC/MSYSDADOS_REPLICA.FDB')
-        self.db_audit = os.environ.get('DATABASE_NAME_LOG', 'C:/Microsys/SJC/MsysIndustrial/dados/AUDITLOG.FDB')
-        self.user = os.environ.get('DATABASE_USER', 'SYSDBA')
-        self.password = os.environ.get('DATABASE_PASSWORD', 'masterkey')
-        self.charset = os.environ.get('DATABASE_CHARSET', 'UTF8')
+        self.use_sqlite = os.environ.get('USE_SQLITE', 'true').lower() == 'true'
+        if self.use_sqlite:
+            self.db_path = os.environ.get('SQLITE_DB_PATH', 'local_database.db')
+        else:
+            # Firebird config
+            self.host = os.environ.get('DATABASE_HOST', '192.168.10.37')
+            self.port = int(os.environ.get('DATABASE_PORT', 3050))
+            self.db_replica = os.environ.get('DATABASE_NAME', 'C:/Replicacao/SJC/MSYSDADOS_REPLICA.FDB')
+            self.db_audit = os.environ.get('DATABASE_NAME_LOG', 'C:/Microsys/SJC/MsysIndustrial/dados/AUDITLOG.FDB')
+            self.user = os.environ.get('DATABASE_USER', 'SYSDBA')
+            self.password = os.environ.get('DATABASE_PASSWORD', 'masterkey')
+            self.charset = os.environ.get('DATABASE_CHARSET', 'UTF8')
 
-    def _connect(self, database_path):
+    def _connect_sqlite(self):
+        return sqlite3.connect(self.db_path)
+
+    def _connect_firebird(self, database_path):
+        import fdb
         return fdb.connect(
             host=f"{self.host}/{self.port}",
             database=database_path,
@@ -23,47 +32,54 @@ class FirebirdManager:
             charset=self.charset
         )
 
-    def get_replica_connection(self):
-        return self._connect(self.db_replica)
-
-    def get_audit_connection(self):
-        return self._connect(self.db_audit)
+    def get_connection(self, use_audit=False):
+        if self.use_sqlite:
+            return self._connect_sqlite()
+        else:
+            database_path = self.db_audit if use_audit else self.db_replica
+            return self._connect_firebird(database_path)
 
     def fetch_all(self, query, params=None, use_audit=False):
-        conn = self.get_audit_connection() if use_audit else self.get_replica_connection()
+        conn = self.get_connection(use_audit)
         try:
             cursor = conn.cursor()
             cursor.execute(query, params or ())
-            columns = [desc[0] for desc in cursor.description]
-            results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            if self.use_sqlite:
+                columns = [desc[0] for desc in cursor.description]
+                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
+            else:
+                columns = [desc[0] for desc in cursor.description]
+                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
             return results
         finally:
             conn.close()
 
     def fetch_one(self, query, params=None, use_audit=False):
-        conn = self.get_audit_connection() if use_audit else self.get_replica_connection()
+        conn = self.get_connection(use_audit)
         try:
             cursor = conn.cursor()
             cursor.execute(query, params or ())
             row = cursor.fetchone()
             if not row:
                 return None
-            columns = [desc[0] for desc in cursor.description]
-            return dict(zip(columns, row))
+            if self.use_sqlite:
+                columns = [desc[0] for desc in cursor.description]
+                return dict(zip(columns, row))
+            else:
+                columns = [desc[0] for desc in cursor.description]
+                return dict(zip(columns, row))
         finally:
             conn.close()
 
-    # ✅ SUA FUNÇÃO NOVA AQUI
-    def buscar_custo_produtos(self):
-        query = """
-            SELECT 
-                pro.pro_codigo, 
-                pro.pro_resumo, 
-                tp.tbp_custo
-            FROM produtos pro
-            INNER JOIN tabelas_produtos tp ON tp.tbp_pro_codigo = pro.pro_codigo
-            WHERE tp.tbp_tab_codigo = 1
-        """
-        return self.fetch_all(query)
+    def execute(self, query, params=None, use_audit=False):
+        conn = self.get_connection(use_audit)
+        try:
+            cursor = conn.cursor()
+            cursor.execute(query, params or ())
+            conn.commit()
+            return cursor.rowcount
+        finally:
+            conn.close()
 
-db = FirebirdManager()
+# Initialize database
+db = DatabaseManager()

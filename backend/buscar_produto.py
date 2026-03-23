@@ -27,10 +27,10 @@ if __name__ == '__main__':
 
     if produto:
         print(json.dumps({
-            'codigo': produto['PRO_CODIGO'],
-            'resumo': produto['PRO_RESUMO'],
-            'custo': float(produto['TBP_CUSTO']),
-            'peso': float(produto['PTR_PESO_EMBALAGEM'])
+            'codigo': produto['pro_codigo'],
+            'resumo': produto['pro_resumo'],
+            'custo': float(produto['tbp_custo']),
+            'peso': float(produto['ptr_peso_embalagem'])
         }))
     else:
         print(json.dumps({'error': 'Produto nao encontrado'}))
