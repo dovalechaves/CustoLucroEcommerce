@@ -1831,6 +1831,8 @@
 
     // ── Utilities ─────────────────────────────────────────────────────────────────
     async function apiFetch(path, options = {}) {
+      const token = localStorage.getItem('ml_access_token');
+      options.headers = { 'Authorization': `Bearer ${token}`, ...(options.headers || {}) };
       return fetch(`${API_BASE}${path}`, options);
     }
 
