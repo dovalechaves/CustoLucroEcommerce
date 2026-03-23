@@ -8,12 +8,14 @@ class DatabaseManager:
     def __init__(self):
         self.use_sqlite = os.environ.get('USE_SQLITE', 'true').lower() == 'true'
         if self.use_sqlite:
-            self.db_path = os.environ.get('SQLITE_DB_PATH', 'local_database.db')
+            base_dir = os.path.dirname(os.path.abspath(__file__))
+            default_db = os.path.join(base_dir, 'local_database.db')
+            self.db_path = os.environ.get('SQLITE_DB_PATH', default_db)
         else:
             # Firebird config
             self.host = os.environ.get('DATABASE_HOST', '192.168.10.37')
             self.port = int(os.environ.get('DATABASE_PORT', 3050))
-            self.db_replica = os.environ.get('DATABASE_NAME', 'C:/Replicacao/SJC/MSYSDADOS_REPLICA.FDB')
+            self.db_replica = os.environ.get('DATABASE_NAME', 'C:/Microsys/SJC/MsysIndustrial/dados/MSYSDADOS.FDB')
             self.db_audit = os.environ.get('DATABASE_NAME_LOG', 'C:/Microsys/SJC/MsysIndustrial/dados/AUDITLOG.FDB')
             self.user = os.environ.get('DATABASE_USER', 'SYSDBA')
             self.password = os.environ.get('DATABASE_PASSWORD', 'masterkey')
