@@ -1,7 +1,7 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { fetchProduto, fetchTokenSalvo, authToken, simulate, type SimulateResults } from "@/lib/api";
 
-type Marketplace = "" | "shopee" | "mercadolivre" | "shein";
+type Marketplace = "" | "shopee" | "mercadolivre";
 type ListingType = "gold_pro" | "gold_special" | "free";
 type RegimeTributario = "mei" | "simples" | "presumido";
 
@@ -9,7 +9,6 @@ const MARKETPLACE_LABELS: Record<Marketplace, string> = {
   "": "Selecionar",
   shopee: "Shopee",
   mercadolivre: "Mercado Livre",
-  shein: "Shein",
 };
 
 const LISTING_FEES: Record<ListingType, number> = {
@@ -19,8 +18,8 @@ const LISTING_FEES: Record<ListingType, number> = {
 };
 
 const LISTING_LABELS: Record<ListingType, string> = {
-  gold_pro: "Gold Pro (19%)",
-  gold_special: "Gold (14%)",
+  gold_pro: "Premium (19%)",
+  gold_special: "Clássico (14%)",
   free: "Grátis (0%)",
 };
 
@@ -35,6 +34,34 @@ const REGIME_LABELS: Record<RegimeTributario, string> = {
   simples: "Simples Nacional (6%)",
   presumido: "Lucro Presumido (8%)",
 };
+
+const SHIPPING_TABLE_GREEN = [
+  { max_weight: 0.3, costs: [5.65, 6.55, 7.75, 12.35, 14.35, 16.45, 18.45, 20.95] },
+  { max_weight: 0.5, costs: [5.95, 6.65, 7.85, 13.25, 15.45, 17.65, 19.85, 22.55] },
+  { max_weight: 1.0, costs: [6.05, 6.75, 7.95, 13.85, 16.15, 18.45, 20.75, 23.65] },
+  { max_weight: 1.5, costs: [6.15, 6.85, 8.05, 14.15, 16.45, 18.85, 21.15, 24.65] },
+  { max_weight: 2.0, costs: [6.25, 6.95, 8.15, 14.45, 16.85, 19.25, 21.65, 24.65] },
+  { max_weight: 3.0, costs: [6.35, 7.15, 8.35, 15.75, 18.35, 21.05, 23.65, 26.25] },
+  { max_weight: 4.0, costs: [6.45, 7.35, 8.55, 17.05, 19.85, 22.75, 25.65, 28.35] },
+  { max_weight: 5.0, costs: [6.55, 7.55, 8.75, 18.45, 21.55, 24.65, 27.75, 30.75] },
+  { max_weight: 9.0, costs: [6.85, 7.95, 9.15, 25.45, 28.55, 32.65, 35.75, 39.75] },
+  { max_weight: 13.0, costs: [8.35, 9.65, 11.25, 41.25, 46.25, 52.95, 57.95, 64.35] },
+  { max_weight: 17.0, costs: [8.35, 9.65, 11.25, 45.95, 51.55, 58.95, 64.55, 71.65] },
+  { max_weight: 30.0, costs: [8.35, 9.65, 11.25, 49.45, 55.45, 63.45, 69.45, 77.15] }
+];
+
+function estimateShipping(price: number, weightGrams: number) {
+  const weightKg = weightGrams / 1000.0;
+  const row = SHIPPING_TABLE_GREEN.find(r => weightKg <= r.max_weight) || SHIPPING_TABLE_GREEN[SHIPPING_TABLE_GREEN.length - 1];
+  if (price < 19) return row.costs[0];
+  if (price < 49) return row.costs[1];
+  if (price < 79) return row.costs[2];
+  if (price < 100) return row.costs[3];
+  if (price < 120) return row.costs[4];
+  if (price < 150) return row.costs[5];
+  if (price < 200) return row.costs[6];
+  return row.costs[7];
+}
 
 const inputClass =
   "w-full bg-secondary border-0 rounded-lg px-4 py-3.5 text-sm font-medium text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200";
@@ -67,10 +94,22 @@ const MarketplaceCalculator = () => {
   const [marketplace, setMarketplace] = useState<Marketplace>("");
   const [codigoProduto, setCodigoProduto] = useState("");
   const [custoProduto, setCustoProduto] = useState("");
-  const [acrescimo, setAcrescimo] = useState("");
   const [taxaPlataforma, setTaxaPlataforma] = useState("");
   const [impostos, setImpostos] = useState("");
+  
+  // New calculation states
   const [margemLucro, setMargemLucro] = useState(20);
+  const [precoVenda, setPrecoVenda] = useState("");
+  const [lastEdited, setLastEdited] = useState<"margin" | "price">("margin");
+  const [quantidade, setQuantidade] = useState(1);
+
+  // Specific items / attributes
+  const [freteGratis, setFreteGratis] = useState(true);
+  const [categoriaId, setCategoriaId] = useState("");
+  const [itemId, setItemId] = useState("");
+  const [myItemsList, setMyItemsList] = useState<any[]>([]);
+  const [isLoadingItems, setIsLoadingItems] = useState(false);
+  const [selectedMyItem, setSelectedMyItem] = useState("");
 
   // ML-specific
   const [listingType, setListingType] = useState<ListingType>("gold_pro");
@@ -112,27 +151,93 @@ const MarketplaceCalculator = () => {
       .finally(() => setIsLoadingToken(false));
   }, []);
 
+  // Local 2-way binding Math Sync
+  const syncValues = useCallback((source: "margin" | "price", value: number) => {
+    const cost = parseFloat(custoProduto) || 0;
+    const weight = parseInt(pesoGramas) || 0;
+
+    if (source === "margin") {
+      const margin = value / 100;
+      if (cost > 0 && margin < 1) {
+        if (isML) {
+          const taxRate = REGIME_TAXES[regimeTributario] / 100;
+          const feeRate = LISTING_FEES[listingType] / 100;
+          const denominator = 1 - margin - feeRate - taxRate;
+          if (denominator > 0) {
+            let price = cost / denominator;
+            for (let i = 0; i < 4; i++) {
+              let shipping = 0;
+              if (price >= 79 || freteGratis) {
+                shipping = estimateShipping(price, weight);
+              }
+              price = (cost + shipping) / denominator;
+            }
+            setPrecoVenda(price.toFixed(2));
+          }
+        } else {
+          const taxRate = (parseFloat(taxaPlataforma) || 0) / 100;
+          const impostosRate = (parseFloat(impostos) || 0) / 100;
+          const denominator = 1 - margin - taxRate - impostosRate;
+          if (denominator > 0) setPrecoVenda((cost / denominator).toFixed(2));
+        }
+      }
+    } else {
+      const price = value;
+      if (price > 0 && cost > 0) {
+        if (isML) {
+          const taxRate = REGIME_TAXES[regimeTributario] / 100;
+          const feeRate = LISTING_FEES[listingType] / 100;
+          let shipping = 0;
+          if (price >= 79 || freteGratis) shipping = estimateShipping(price, weight);
+          const profit = price - cost - shipping - (price * feeRate) - (price * taxRate);
+          setMargemLucro(Number(((profit / price) * 100).toFixed(1)));
+        } else {
+          const taxRate = (parseFloat(taxaPlataforma) || 0) / 100;
+          const impostosRate = (parseFloat(impostos) || 0) / 100;
+          const profit = price - cost - (price * taxRate) - (price * impostosRate);
+          setMargemLucro(Number(((profit / price) * 100).toFixed(1)));
+        }
+      }
+    }
+  }, [custoProduto, isML, regimeTributario, listingType, freteGratis, pesoGramas, taxaPlataforma, impostos]);
+
+  // Keep values in sync when dependencies change
+  useEffect(() => {
+    syncValues(lastEdited, lastEdited === "margin" ? margemLucro : parseFloat(precoVenda) || 0);
+  }, [syncValues, lastEdited, margemLucro, precoVenda, custoProduto, pesoGramas, isML, listingType, regimeTributario, freteGratis, taxaPlataforma, impostos]);
+
   // Reset simulation when inputs change
   useEffect(() => {
     setMlSim(null);
     setSimErro(null);
-  }, [marketplace, custoProduto, acrescimo, listingType, regimeTributario, pesoGramas, margemLucro]);
+  }, [marketplace, custoProduto, listingType, regimeTributario, pesoGramas, freteGratis, margemLucro, precoVenda, quantidade]);
 
   // Local calculation (always available)
   const results = useMemo(() => {
-    const custo = parseFloat(custoProduto) || 0;
-    const acresc = parseFloat(acrescimo) || 0;
-    const custoTotal = custo + acresc;
-    const totalPercentual = effectiveTaxa + effectiveImpostos + margemLucro;
+    const cost = parseFloat(custoProduto) || 0;
+    const price = parseFloat(precoVenda) || 0;
+    let profit = 0;
+    let shipping = 0;
 
-    if (totalPercentual >= 100) return { valorFinal: 0, lucroPorVenda: 0 };
+    if (isML) {
+      const taxRate = REGIME_TAXES[regimeTributario] / 100;
+      const feeRate = LISTING_FEES[listingType] / 100;
+      if (price >= 79 || freteGratis) {
+        shipping = estimateShipping(price, parseInt(pesoGramas) || 0);
+      }
+      profit = price - cost - shipping - (price * feeRate) - (price * taxRate);
+    } else {
+      const taxRate = (parseFloat(taxaPlataforma) || 0) / 100;
+      const impostosRate = (parseFloat(impostos) || 0) / 100;
+      profit = price - cost - (price * taxRate) - (price * impostosRate);
+    }
 
-    const valorFinal = custoTotal / (1 - totalPercentual / 100);
     return {
-      valorFinal: Math.max(0, valorFinal),
-      lucroPorVenda: Math.max(0, valorFinal * (margemLucro / 100)),
+      valorFinal: price,
+      lucroPorVenda: profit,
+      frete: shipping,
     };
-  }, [custoProduto, acrescimo, effectiveTaxa, effectiveImpostos, margemLucro]);
+  }, [precoVenda, custoProduto, taxaPlataforma, impostos, isML, listingType, regimeTributario, pesoGramas, freteGratis]);
 
   const buscarProduto = async () => {
     if (!codigoProduto.trim()) return;
@@ -141,7 +246,8 @@ const MarketplaceCalculator = () => {
     setProdutoNome(null);
     try {
       const data = await fetchProduto(codigoProduto);
-      setCustoProduto(String(data.custo));
+      const custoFmt = Number(data.custo).toFixed(2);
+      setCustoProduto(custoFmt);
       if (data.peso) setPesoGramas(String(data.peso));
       setProdutoNome(data.resumo);
     } catch {
@@ -165,22 +271,65 @@ const MarketplaceCalculator = () => {
     }
   };
 
+  const carregarMeusAnuncios = async () => {
+    if (!mlToken) return;
+    setIsLoadingItems(true);
+    try {
+      const sellerId = localStorage.getItem("ml_seller_id");
+      const res = await fetch(`http://localhost:3001/api/my-items?seller_id=${sellerId || ""}`, {
+        headers: { Authorization: `Bearer ${mlToken}` }
+      });
+      const data = await res.json();
+      setMyItemsList(data.items || []);
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao carregar anúncios");
+    } finally {
+      setIsLoadingItems(false);
+    }
+  };
+
+  const handleSelectMyItem = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const id = e.target.value;
+    setSelectedMyItem(id);
+    if (!id) return;
+    const item = myItemsList.find(i => i.id === id);
+    if (item) {
+      setItemId(item.id);
+      setCategoriaId(item.category_id || "");
+      setPrecoVenda(String(item.price || 0));
+      setLastEdited("price");
+      syncValues("price", item.price || 0);
+
+      if (item.listing_type_id === "gold_pro" || item.listing_type_id === "gold_special" || item.listing_type_id === "free") {
+        setListingType(item.listing_type_id as ListingType);
+      }
+    }
+  };
+
   const simularML = async () => {
     setIsSimulating(true);
     setSimErro(null);
     try {
-      const custo = (parseFloat(custoProduto) || 0) + (parseFloat(acrescimo) || 0);
-      const data = await simulate(
-        {
-          price: Math.max(results.valorFinal, 1),
-          cost: custo,
-          listing_type_id: listingType,
-          weight: parseInt(pesoGramas) || 500,
-          tax_regime: regimeTributario,
-          free_shipping: true,
-        },
-        mlToken || undefined
-      );
+      const custo = parseFloat(custoProduto) || 0;
+      const payload: any = {
+        price: parseFloat(precoVenda) || 0,
+        cost: custo,
+        quantity: quantidade,
+        listing_type_id: listingType,
+        weight: parseInt(pesoGramas) || 500,
+        tax_regime: regimeTributario,
+        free_shipping: freteGratis,
+      };
+
+      if (categoriaId) payload.category_id = categoriaId;
+      if (itemId) payload.item_id = itemId;
+      if (mlToken) {
+        const savedSellerId = localStorage.getItem("ml_seller_id");
+        if (savedSellerId) payload.seller_id = savedSellerId;
+      }
+
+      const data = await simulate(payload, mlToken || undefined);
       setMlSim(data.results);
     } catch {
       setSimErro("Erro ao simular. Verifique se o backend está rodando.");
@@ -216,6 +365,73 @@ const MarketplaceCalculator = () => {
               <ChevronIcon />
             </div>
           </div>
+
+          {/* Tipo de Anúncio e Regime Tributário (ML) ou Taxas (Outros) */}
+          {isML ? (
+            <>
+              <div className="space-y-2 mb-6">
+                <label className={labelClass}>Tipo de Anúncio</label>
+                <div className="relative mt-2">
+                  <select
+                    value={listingType}
+                    onChange={(e) => setListingType(e.target.value as ListingType)}
+                    className={selectClass}
+                  >
+                    {Object.entries(LISTING_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                  <ChevronIcon />
+                </div>
+              </div>
+
+              <div className="space-y-2 mb-6">
+                <label className={labelClass}>Regime Tributário</label>
+                <div className="relative">
+                  <select
+                    value={regimeTributario}
+                    onChange={(e) => setRegimeTributario(e.target.value as RegimeTributario)}
+                    className={selectClass}
+                  >
+                    {Object.entries(REGIME_LABELS).map(([value, label]) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                  <ChevronIcon />
+                </div>
+              </div>
+            </>
+          ) : marketplace !== "" ? (
+            <>
+              <div className="space-y-2 mb-6">
+                <label className={labelClass}>Taxa da Plataforma (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={taxaPlataforma}
+                  onChange={(e) => setTaxaPlataforma(e.target.value)}
+                  placeholder="0,00"
+                  className={inputClass}
+                />
+              </div>
+
+              <div className="space-y-2 mb-6">
+                <label className={labelClass}>Impostos (%)</label>
+                <input
+                  type="number"
+                  min="0"
+                  max="100"
+                  step="0.01"
+                  value={impostos}
+                  onChange={(e) => setImpostos(e.target.value)}
+                  placeholder="0,00"
+                  className={inputClass}
+                />
+              </div>
+            </>
+          ) : null}
 
           {/* Busca de Produto */}
           <div className="space-y-2 mb-6">
@@ -254,179 +470,163 @@ const MarketplaceCalculator = () => {
               min="0"
               step="0.01"
               value={custoProduto}
-              onChange={(e) => setCustoProduto(e.target.value)}
+            readOnly
               placeholder="0,00"
-              className={inputClass}
+            className={`${inputClass} opacity-70 cursor-not-allowed`}
             />
+            {custoProduto !== "" && (
+              <p className="text-xs text-[#00A650] font-medium mt-1">✅ Custo importado do sistema</p>
+            )}
           </div>
 
-          {/* Acréscimo */}
           <div className="space-y-2 mb-6">
-            <label className={labelClass}>Acréscimo (R$)</label>
+            <label className={labelClass}>Peso do Produto (g)</label>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={pesoGramas}
+              readOnly
+              placeholder="500"
+              className={`${inputClass} opacity-70 cursor-not-allowed`}
+            />
+            {custoProduto !== "" && (
+              <p className="text-xs text-[#00A650] font-medium mt-1">✅ Peso importado do sistema</p>
+            )}
+          </div>
+
+
+          {/* Preço de Venda */}
+          <div className="space-y-2 mb-6">
+            <label className={labelClass}>Preço de Venda (R$)</label>
             <input
               type="number"
               min="0"
               step="0.01"
-              value={acrescimo}
-              onChange={(e) => setAcrescimo(e.target.value)}
+              value={precoVenda}
+              onChange={(e) => {
+                setPrecoVenda(e.target.value);
+                setLastEdited("price");
+              }}
               placeholder="0,00"
               className={inputClass}
             />
           </div>
-
-          {/* ML-specific OR campos manuais */}
-          {isML ? (
-            <>
-              <div className="space-y-2 mb-6">
-                <label className={labelClass}>Tipo de Anúncio</label>
-                <div className="relative">
-                  <select
-                    value={listingType}
-                    onChange={(e) => setListingType(e.target.value as ListingType)}
-                    className={selectClass}
-                  >
-                    {Object.entries(LISTING_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
-                  <ChevronIcon />
-                </div>
-              </div>
-
-              <div className="space-y-2 mb-6">
-                <label className={labelClass}>Regime Tributário</label>
-                <div className="relative">
-                  <select
-                    value={regimeTributario}
-                    onChange={(e) => setRegimeTributario(e.target.value as RegimeTributario)}
-                    className={selectClass}
-                  >
-                    {Object.entries(REGIME_LABELS).map(([value, label]) => (
-                      <option key={value} value={value}>{label}</option>
-                    ))}
-                  </select>
-                  <ChevronIcon />
-                </div>
-              </div>
-
-              <div className="space-y-2 mb-6">
-                <label className={labelClass}>Peso do Produto (g)</label>
-                <input
-                  type="number"
-                  min="1"
-                  step="1"
-                  value={pesoGramas}
-                  onChange={(e) => setPesoGramas(e.target.value)}
-                  placeholder="500"
-                  className={inputClass}
-                />
-              </div>
-            </>
-          ) : (
-            <>
-              <div className="space-y-2 mb-6">
-                <label className={labelClass}>Taxa da Plataforma (%)</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={taxaPlataforma}
-                  onChange={(e) => setTaxaPlataforma(e.target.value)}
-                  placeholder="0,00"
-                  className={inputClass}
-                />
-              </div>
-
-              <div className="space-y-2 mb-6">
-                <label className={labelClass}>Impostos (%)</label>
-                <input
-                  type="number"
-                  min="0"
-                  max="100"
-                  step="0.01"
-                  value={impostos}
-                  onChange={(e) => setImpostos(e.target.value)}
-                  placeholder="0,00"
-                  className={inputClass}
-                />
-              </div>
-            </>
-          )}
 
           {/* Margem de Lucro */}
           <div className="space-y-3 mb-6">
             <div className="flex items-center justify-between">
               <label className={labelClass}>Margem de Lucro</label>
-              <span className="text-sm font-bold text-primary tabular-nums">{margemLucro}%</span>
+              <div className="flex items-center gap-2">
+                <input
+                  type="number"
+                  min="-100"
+                  max="100"
+                  step="0.1"
+                  value={margemLucro}
+                  onChange={(e) => {
+                    setMargemLucro(Number(e.target.value));
+                    setLastEdited("margin");
+                  }}
+                  className="w-20 bg-secondary border-0 rounded-lg px-2 py-1 text-sm font-medium text-right focus:ring-2 focus:ring-primary outline-none"
+                />
+                <span className="text-sm font-bold text-primary tabular-nums">%</span>
+              </div>
             </div>
             <input
               type="range"
-              min="0"
-              max="60"
-              step="1"
+              min="-100"
+              max="100"
+              step="0.1"
               value={margemLucro}
-              onChange={(e) => setMargemLucro(Number(e.target.value))}
+              onChange={(e) => {
+                setMargemLucro(Number(e.target.value));
+                setLastEdited("margin");
+              }}
               className="w-full h-2 rounded-full appearance-none cursor-pointer bg-secondary accent-primary"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground font-medium">
-              <span>0%</span>
-              <span>60%</span>
+              <span>-100%</span>
+              <span>100%</span>
             </div>
           </div>
 
-          {/* ML Auth + Simular */}
-          {isML && (
-            <div className="border-t border-border pt-6 space-y-4">
-              {/* Status de autenticação */}
-              <div className="flex items-center gap-2">
-                <div
-                  className={`w-2 h-2 rounded-full flex-shrink-0 ${
-                    mlToken ? "bg-green-500" : "bg-muted-foreground/40"
-                  }`}
-                />
-                <span className="text-xs text-muted-foreground">
-                  {isLoadingToken
-                    ? "Carregando token..."
-                    : mlToken
-                    ? `ML conectado: ${mlUser}`
-                    : "Não autenticado no Mercado Livre"}
-                </span>
-              </div>
+          {/* Quantidade */}
+          <div className="space-y-2 mb-6">
+            <label className={labelClass}>Quantidade</label>
+            <input
+              type="number"
+              min="1"
+              step="1"
+              value={quantidade}
+              onChange={(e) => setQuantidade(parseInt(e.target.value) || 1)}
+              className={inputClass}
+            />
+          </div>
 
-              {/* Input manual de token (só se não autenticado) */}
-              {!mlToken && !isLoadingToken && (
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    value={tokenInput}
-                    onChange={(e) => setTokenInput(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && autenticarToken()}
-                    placeholder="Token de acesso ML"
-                    className={`${inputClass} flex-1 text-xs`}
-                  />
-                  <button
-                    onClick={autenticarToken}
-                    disabled={!tokenInput.trim() || isLoadingToken}
-                    className="px-3 py-2 bg-secondary text-foreground rounded-lg text-xs font-semibold hover:opacity-80 transition-opacity disabled:opacity-40"
-                  >
-                    Entrar
-                  </button>
+          {/* Importar Meus Anúncios */}
+          {isML && mlToken && (
+            <div className="space-y-2 mb-6">
+              <button
+                onClick={carregarMeusAnuncios}
+                disabled={isLoadingItems}
+                className="w-full py-3 bg-secondary text-foreground rounded-lg text-sm font-semibold hover:opacity-80 transition-opacity"
+              >
+                {isLoadingItems ? "Carregando anúncios..." : "☁️ Importar Meus Anúncios do Mercado Livre"}
+              </button>
+              {myItemsList.length > 0 && (
+                <div className="relative mt-2">
+                  <select value={selectedMyItem} onChange={handleSelectMyItem} className={selectClass}>
+                    <option value="">Selecione um anúncio...</option>
+                    {myItemsList.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.id} - {item.title} (R$ {item.price})
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronIcon />
                 </div>
               )}
+            </div>
+          )}
 
-              {/* Botão Simular */}
-              {results.valorFinal > 0 && (
-                <button
-                  onClick={simularML}
-                  disabled={isSimulating}
-                  className="w-full py-3 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-60"
-                >
-                  {isSimulating ? "Simulando..." : "Simular com dados reais do ML"}
-                </button>
-              )}
+          {/* O Resto: Frete, Categoria, Item ID */}
+          {isML && (
+            <>
+              <div className="space-y-2 mb-6">
+                <label className="flex items-center gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={freteGratis}
+                    onChange={(e) => setFreteGratis(e.target.checked)}
+                    className="w-5 h-5 rounded border-secondary text-primary focus:ring-primary"
+                  />
+                  <span className="text-sm font-medium text-foreground">Oferecer Frete Grátis</span>
+                </label>
+              </div>
 
-              {simErro && <p className="text-xs text-destructive">{simErro}</p>}
+              <div className="space-y-2 mb-6">
+                <label className={labelClass}>Categoria (Produto Inédito)</label>
+                <input
+                  type="text"
+                  value={categoriaId}
+                  readOnly
+                  placeholder="MLB1055"
+                  className={`${inputClass} opacity-70 cursor-not-allowed`}
+                />
+              </div>
+
+              <div className="space-y-2 mb-6">
+                <label className={labelClass}>Item ID ML (opcional)</label>
+                <input type="text" value={itemId} readOnly placeholder="MLB123456789" className={`${inputClass} opacity-70 cursor-not-allowed`} />
+              </div>
+            </>
+          )}
+
+          {/* ML Auth + Simular */}
+          {isML && simErro && (
+            <div className="border-t border-border pt-6 space-y-4">
+              <p className="text-xs text-destructive">{simErro}</p>
             </div>
           )}
         </div>
@@ -442,13 +642,14 @@ const MarketplaceCalculator = () => {
           <div className="space-y-5">
             <ResultRow label="Marketplace" value={marketplace ? MARKETPLACE_LABELS[marketplace] : "—"} />
             <ResultRow label="Custo do Produto" value={fmt(parseFloat(custoProduto) || 0)} />
-            <ResultRow label="Acréscimo" value={fmt(parseFloat(acrescimo) || 0)} />
+            <ResultRow label="Quantidade" value={String(quantidade)} />
 
             {isML ? (
               <>
                 <ResultRow label="Tipo de Anúncio" value={LISTING_LABELS[listingType]} />
                 <ResultRow label="Regime Tributário" value={REGIME_LABELS[regimeTributario]} />
                 <ResultRow label="Peso" value={`${pesoGramas}g`} />
+                <ResultRow label="Custo de Frete (Estimado)" value={fmt(results.frete)} />
               </>
             ) : (
               <>
@@ -463,23 +664,46 @@ const MarketplaceCalculator = () => {
             {mlSim && (
               <>
                 <div className="h-px bg-border" />
-                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">
-                  Dados reais do ML
-                </p>
-                <ResultRow
-                  label="Taxa ML"
-                  value={`${mlSim.ml_fee_percent.toFixed(1)}% (${fmt(mlSim.ml_fee_amount)})`}
-                />
-                <ResultRow label="Frete estimado" value={fmt(mlSim.shipping_cost)} />
-                <ResultRow
-                  label="Impostos"
-                  value={`${mlSim.tax_rate_percent.toFixed(0)}% (${fmt(mlSim.tax_amount)})`}
-                />
-                <ResultRow
-                  label="Margem real"
-                  value={`${mlSim.margin_percent.toFixed(1)}%`}
-                  accent={mlSim.margin_percent > 0}
-                />
+                <h3 className="font-bold text-foreground mb-4">📊 Detalhamento Real do ML</h3>
+
+                <div className="flex h-4 w-full rounded-full overflow-hidden mb-4 bg-secondary">
+                  <div style={{ width: `${Math.max(0, (mlSim.ml_fee_amount / mlSim.gross_revenue) * 100)}%`, backgroundColor: '#FF7733' }} />
+                  <div style={{ width: `${Math.max(0, (mlSim.shipping_cost / mlSim.gross_revenue) * 100)}%`, backgroundColor: '#7B61FF' }} />
+                  <div style={{ width: `${Math.max(0, (mlSim.tax_amount / mlSim.gross_revenue) * 100)}%`, backgroundColor: '#FFB800' }} />
+                  <div style={{ width: `${Math.max(0, (mlSim.product_cost / mlSim.gross_revenue) * 100)}%`, backgroundColor: '#E02020' }} />
+                  <div style={{ width: `${Math.max(0, (Math.max(mlSim.net_profit, 0) / mlSim.gross_revenue) * 100)}%`, backgroundColor: '#00A650' }} />
+                </div>
+
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full bg-foreground" /> <span>Receita Bruta</span></div>
+                    <span className="font-bold text-foreground">{fmt(mlSim.gross_revenue)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full" style={{backgroundColor: '#FF7733'}} /> <span>Taxa ML ({mlSim.ml_fee_percent.toFixed(1)}%)</span></div>
+                    <span className="text-destructive">− {fmt(mlSim.ml_fee_amount)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full" style={{backgroundColor: '#7B61FF'}} /> <span>Frete</span></div>
+                    <span className="text-destructive">− {fmt(mlSim.shipping_cost)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full" style={{backgroundColor: '#FFB800'}} /> <span>Imposto ({mlSim.tax_rate_percent.toFixed(0)}%)</span></div>
+                    <span className="text-destructive">− {fmt(mlSim.tax_amount)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full" style={{backgroundColor: '#E02020'}} /> <span>Custo do Produto</span></div>
+                    <span className="text-destructive">− {fmt(mlSim.product_cost)}</span>
+                  </div>
+                  <div className="flex justify-between pt-2 border-t border-border mt-2">
+                    <div className="flex items-center gap-2"><div className="w-3 h-3 rounded-full" style={{backgroundColor: '#00A650'}} /> <span className="font-bold">Lucro Líquido</span></div>
+                    <span className={`font-bold ${mlSim.net_profit >= 0 ? "text-[#00A650]" : "text-destructive"}`}>{fmt(mlSim.net_profit)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="font-medium text-muted-foreground ml-5">Margem</span>
+                    <span className={`font-bold ${mlSim.margin_percent >= 0 ? "text-[#00A650]" : "text-destructive"}`}>{mlSim.margin_percent.toFixed(1)}%</span>
+                  </div>
+                </div>
               </>
             )}
 
@@ -492,7 +716,7 @@ const MarketplaceCalculator = () => {
                   Valor Final
                 </span>
                 <span className="text-2xl font-bold text-primary-foreground tabular-nums">
-                  {fmt(mlSim ? mlSim.gross_revenue : results.valorFinal)}
+                  {fmt(results.valorFinal)}
                 </span>
               </div>
               <div className="h-px bg-primary-foreground/15" />
@@ -501,7 +725,7 @@ const MarketplaceCalculator = () => {
                   Lucro por Venda
                 </span>
                 <span className="text-2xl font-bold text-accent tabular-nums">
-                  {fmt(mlSim ? mlSim.net_profit : results.lucroPorVenda)}
+                  {fmt(results.lucroPorVenda)}
                 </span>
               </div>
             </div>
