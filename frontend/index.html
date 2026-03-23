@@ -1295,6 +1295,10 @@
     async function loadUser() {
       try {
         const res = await apiFetch(`/api/user?seller_id=${sellerId}`);
+        if (res.status === 401 || res.status === 403) {
+          await autoLoginFromDB();
+          return;
+        }
         const user = await res.json();
         const name = user.first_name || user.nickname || 'Usuário';
         document.getElementById('user-greeting').textContent = `Olá, ${name}!`;
@@ -1911,11 +1915,12 @@
 
     try {
       const res  = await fetch(`/api/produto/${encodeURIComponent(codigo)}`);
-      const data = await res.json();
+      let data;
+      try { data = await res.json(); } catch { data = { error: `HTTP ${res.status}` }; }
 
       if (!res.ok || data.error) {
         statusSpan.style.color = 'var(--ml-danger)';
-        statusSpan.textContent = '❌ Produto não encontrado';
+        statusSpan.textContent = `❌ ${data.error || 'Produto não encontrado'}`;
         return;
       }
 
@@ -1929,7 +1934,7 @@
 
     } catch (e) {
       statusSpan.style.color = 'var(--ml-danger)';
-      statusSpan.textContent = '❌ Erro ao conectar com o servidor';
+      statusSpan.textContent = `❌ ${e.message}`;
     }
   }
 

@@ -44,13 +44,8 @@ class DatabaseManager:
         try:
             cursor = conn.cursor()
             cursor.execute(query, params or ())
-            if self.use_sqlite:
-                columns = [desc[0] for desc in cursor.description]
-                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            else:
-                columns = [desc[0] for desc in cursor.description]
-                results = [dict(zip(columns, row)) for row in cursor.fetchall()]
-            return results
+            columns = [desc[0].lower() for desc in cursor.description]
+            return [dict(zip(columns, row)) for row in cursor.fetchall()]
         finally:
             conn.close()
 
@@ -62,12 +57,8 @@ class DatabaseManager:
             row = cursor.fetchone()
             if not row:
                 return None
-            if self.use_sqlite:
-                columns = [desc[0] for desc in cursor.description]
-                return dict(zip(columns, row))
-            else:
-                columns = [desc[0] for desc in cursor.description]
-                return dict(zip(columns, row))
+            columns = [desc[0].lower() for desc in cursor.description]
+            return dict(zip(columns, row))
         finally:
             conn.close()
 

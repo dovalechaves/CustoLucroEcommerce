@@ -5,6 +5,7 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 load_dotenv()
+from db import db
 
 app = Flask(__name__)
 CORS(app, supports_credentials=True)
@@ -120,11 +121,13 @@ def auth_token():
 @app.route('/api/user', methods=['GET'])
 def api_user():
     token = get_token(request)
+    print(token)
     if not token:
         return jsonify({"error": "Header Authorization: Bearer <token> obrigatório"}), 401
     try:
         res = requests.get(f"{ML_API}/users/me", headers=ml_headers(token))
-        res.raise_for_status()
+        if not res.ok:
+            return jsonify({"error": "Token inválido ou expirado"}), res.status_code
         return jsonify(res.json())
     except Exception as e:
         return jsonify({"error": str(e)}), 500
@@ -275,6 +278,29 @@ def api_simulate():
             "margin_percent": margin
         }
     })
+
+@app.route('/api/produto/<int:codigo>', methods=['GET'])
+def api_produto(codigo):
+    try:
+        query = """
+            SELECT
+                pro.pro_codigo,
+                pro.pro_resumo         AS resumo,
+                tp.tbp_custo           AS custo,
+                pt.ptr_peso_embalagem  AS peso
+            FROM produtos pro
+            INNER JOIN tabelas_produtos tp ON tp.tbp_pro_codigo = pro.pro_codigo
+            INNER JOIN produtos_tray pt ON pt.ptr_pro_codigo = pro.pro_codigo
+            WHERE tp.tbp_tab_codigo = 1
+              AND pro.pro_codigo = ?
+        """
+        produto = db.fetch_one(query, params=(codigo,))
+        if not produto:
+            return jsonify({'error': 'Produto não encontrado'}), 404
+        return jsonify(produto)
+    except Exception as e:
+        import traceback
+        return jsonify({'error': 'Erro interno', 'detail': traceback.format_exc()}), 500
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 3001))
