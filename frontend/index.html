@@ -873,21 +873,15 @@
 
             <div class="form-group">
               <label>Preço de Venda (R$)</label>
-              <input type="number" id="sim-price" placeholder="0,00" min="0" step="0.01" />
+              <input type="number" id="sim-price" placeholder="0,00" min="0" step="0.01" oninput="syncPriceInput(this.value)" />
             </div>
 
-            <div class="form-group">
-              <div style="display:flex;gap:14px;align-items:center;">
-                <label style="margin:0;">Margem de Lucro (%)</label>
-                <div style="display:flex;gap:8px;align-items:center;">
-                  <input type="radio" name="sim-mode" id="sim-mode-price" value="price" checked onchange="syncMarginMode()" />
-                  <label for="sim-mode-price" style="margin:0;cursor:pointer;">Preço</label>
-                  <input type="radio" name="sim-mode" id="sim-mode-margin" value="margin" onchange="syncMarginMode()" />
-                  <label for="sim-mode-margin" style="margin:0;cursor:pointer;">Margem</label>
-                </div>
+          <div class="form-group" style="margin-bottom: 16px;">
+              <label>Margem de Lucro (%)</label>
+              <div style="display:flex; gap:8px;">
+                <input type="number" id="sim-margin" placeholder="Ex: 20" min="0" max="100" step="0.1" value="20" oninput="syncMarginSlider(this.value)" style="width: 80px;" />
+                <input type="range" id="sim-margin-range" min="0" max="100" step="0.1" value="20" oninput="syncMarginInput(this.value)" style="flex:1; cursor: pointer;" />
               </div>
-              <input type="number" id="sim-margin" placeholder="Ex: 20" min="0" max="100" step="0.1" oninput="syncMarginSlider(this.value)" />
-              <input type="range" id="sim-margin-range" min="0" max="100" step="0.1" value="0" oninput="syncMarginInput(this.value)" />
             </div>
 
             <div class="form-group">
@@ -906,20 +900,20 @@
               <span id="sim-weight-status" style="font-size:12px;margin-top:4px;display:block"></span>
             </div>
             <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px;">
-              <input type="checkbox" id="sim-free-shipping" checked />
+            <input type="checkbox" id="sim-free-shipping" checked onchange="updatePricingVars()" />
               <label for="sim-free-shipping" style="cursor: pointer; margin: 0; padding-top: 2px;">Oferecer Frete Grátis</label>
             </div>
             <div class="form-group">
               <label>Tipo de Anúncio</label>
-              <select id="sim-listing-type">
-                <option value="gold_premium">Premium (16%)</option>
-                <option value="gold_special" selected>Clássico (12%)</option>
+            <select id="sim-listing-type" onchange="updatePricingVars()">
+                <option value="gold_pro">Premium (19%)</option>
+                <option value="gold_special" selected>Clássico (14%)</option>
                 <option value="free">Grátis (0%)</option>
               </select>
             </div>
             <div class="form-group">
               <label>Regime Tributário</label>
-              <select id="sim-tax-regime">
+            <select id="sim-tax-regime" onchange="updatePricingVars()">
                 <option value="simples">Simples Nacional (~6%)</option>
                 <option value="mei">MEI (~3%)</option>
                 <option value="presumido">Lucro Presumido (~8%)</option>
@@ -1010,21 +1004,15 @@
 
             <div class="form-group">
               <label>Preço de Venda (R$)</label>
-              <input type="number" id="sim-price" placeholder="0,00" min="0" step="0.01" />
+              <input type="number" id="sim-price" placeholder="0,00" min="0" step="0.01" oninput="syncPriceInput(this.value)" />
             </div>
 
-            <div class="form-group">
-              <div style="display:flex;gap:14px;align-items:center;">
-                <label style="margin:0;">Margem de Lucro (%)</label>
-                <div style="display:flex;gap:8px;align-items:center;">
-                  <input type="radio" name="sim-mode" id="sim-mode-price" value="price" checked onchange="syncMarginMode()" />
-                  <label for="sim-mode-price" style="margin:0;cursor:pointer;">Preço</label>
-                  <input type="radio" name="sim-mode" id="sim-mode-margin" value="margin" onchange="syncMarginMode()" />
-                  <label for="sim-mode-margin" style="margin:0;cursor:pointer;">Margem</label>
-                </div>
+          <div class="form-group" style="margin-bottom: 16px;">
+              <label>Margem de Lucro (%)</label>
+              <div style="display:flex; gap:8px;">
+                <input type="number" id="sim-margin" placeholder="Ex: 20" min="0" max="100" step="0.1" value="20" oninput="syncMarginSlider(this.value)" style="width: 80px;" />
+                <input type="range" id="sim-margin-range" min="0" max="100" step="0.1" value="20" oninput="syncMarginInput(this.value)" style="flex:1; cursor: pointer;" />
               </div>
-              <input type="number" id="sim-margin" placeholder="Ex: 20" min="0" max="100" step="0.1" oninput="syncMarginSlider(this.value)" />
-              <input type="range" id="sim-margin-range" min="0" max="100" step="0.1" value="0" oninput="syncMarginInput(this.value)" />
             </div>
 
             <div class="form-group">
@@ -1043,21 +1031,20 @@
               <span id="sim-weight-status" style="font-size:12px;margin-top:4px;display:block"></span>
             </div>
             <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px;">
-              <input type="checkbox" id="sim-free-shipping" checked />
-              <label for="sim-free-shipping" style="cursor: pointer; margin: 0; padding-top: 2px;">Oferecer Frete
-                Grátis</label>
+            <input type="checkbox" id="sim-free-shipping" checked onchange="updatePricingVars()" />
+            <label for="sim-free-shipping" style="cursor: pointer; margin: 0; padding-top: 2px;">Oferecer Frete Grátis</label>
             </div>
             <div class="form-group">
               <label>Tipo de Anúncio</label>
-              <select id="sim-listing-type">
-                <option value="gold_premium">Premium (16%)</option>
-                <option value="gold_special" selected>Clássico (12%)</option>
+            <select id="sim-listing-type" onchange="updatePricingVars()">
+                <option value="gold_pro">Premium (19%)</option>
+                <option value="gold_special" selected>Clássico (14%)</option>
                 <option value="free">Grátis (0%)</option>
               </select>
             </div>
             <div class="form-group">
               <label>Regime Tributário</label>
-              <select id="sim-tax-regime">
+            <select id="sim-tax-regime" onchange="updatePricingVars()">
                 <option value="simples">Simples Nacional (~6%)</option>
                 <option value="mei">MEI (~3%)</option>
                 <option value="presumido">Lucro Presumido (~8%)</option>
@@ -1155,9 +1142,9 @@
     const TAX_RATES = { mei: 0.03, simples: 0.06, presumido: 0.08 };
     const LISTING_RATES = {
       free: 0, bronze: 0, silver: 0.08,
-      gold: 0.12, gold_special: 0.12,
-      gold_pro: 0.16, gold_premium: 0.16,
-      premium: 0.16, classic: 0.12
+      gold: 0.14, gold_special: 0.14,
+      gold_pro: 0.19, gold_premium: 0.19,
+      premium: 0.19, classic: 0.14
     };
 
     // ── Init ──────────────────────────────────────────────────────────────────────
@@ -1695,30 +1682,107 @@
     }
 
     function syncMarginMode() {
-      const mode = document.querySelector('input[name="sim-mode"]:checked')?.value || 'price';
-      const priceInput = document.getElementById('sim-price');
-      const marginInput = document.getElementById('sim-margin');
-      const marginRange = document.getElementById('sim-margin-range');
-      if (mode === 'margin') {
-        if (priceInput) { priceInput.disabled = true; priceInput.style.opacity = '0.5'; }
-        if (marginInput) { marginInput.disabled = false; marginInput.style.opacity = '1'; }
-        if (marginRange) { marginRange.disabled = false; }
-      } else {
-        if (priceInput) { priceInput.disabled = false; priceInput.style.opacity = '1'; }
-        if (marginInput) { marginInput.disabled = true; marginInput.style.opacity = '0.5'; }
-        if (marginRange) { marginRange.disabled = true; }
-      }
+      // Função desativada pois o sistema agora utiliza apenas margem
     }
 
     function syncMarginSlider(value) {
-      const marginInput = document.getElementById('sim-margin');
-      marginInput.value = Number(value).toFixed(1);
       document.getElementById('sim-margin-range').value = value;
+      _atualizarPrecoVenda(value);
     }
 
     function syncMarginInput(value) {
-      const marginRange = document.getElementById('sim-margin-range');
-      marginRange.value = Number(value);
+      document.getElementById('sim-margin').value = Number(value).toFixed(1);
+      _atualizarPrecoVenda(value);
+    }
+
+    const SHIPPING_TABLE_GREEN = [
+      { max_weight: 0.3, costs: [5.65, 6.55, 7.75, 12.35, 14.35, 16.45, 18.45, 20.95] },
+      { max_weight: 0.5, costs: [5.95, 6.65, 7.85, 13.25, 15.45, 17.65, 19.85, 22.55] },
+      { max_weight: 1.0, costs: [6.05, 6.75, 7.95, 13.85, 16.15, 18.45, 20.75, 23.65] },
+      { max_weight: 1.5, costs: [6.15, 6.85, 8.05, 14.15, 16.45, 18.85, 21.15, 24.65] },
+      { max_weight: 2.0, costs: [6.25, 6.95, 8.15, 14.45, 16.85, 19.25, 21.65, 24.65] },
+      { max_weight: 3.0, costs: [6.35, 7.15, 8.35, 15.75, 18.35, 21.05, 23.65, 26.25] },
+      { max_weight: 4.0, costs: [6.45, 7.35, 8.55, 17.05, 19.85, 22.75, 25.65, 28.35] },
+      { max_weight: 5.0, costs: [6.55, 7.55, 8.75, 18.45, 21.55, 24.65, 27.75, 30.75] },
+      { max_weight: 9.0, costs: [6.85, 7.95, 9.15, 25.45, 28.55, 32.65, 35.75, 39.75] },
+      { max_weight: 13.0, costs: [8.35, 9.65, 11.25, 41.25, 46.25, 52.95, 57.95, 64.35] },
+      { max_weight: 17.0, costs: [8.35, 9.65, 11.25, 45.95, 51.55, 58.95, 64.55, 71.65] },
+      { max_weight: 30.0, costs: [8.35, 9.65, 11.25, 49.45, 55.45, 63.45, 69.45, 77.15] }
+    ];
+
+    function estimateShipping(price, weightGrams) {
+      const weightKg = weightGrams / 1000.0;
+      const row = SHIPPING_TABLE_GREEN.find(r => weightKg <= r.max_weight) || SHIPPING_TABLE_GREEN[SHIPPING_TABLE_GREEN.length - 1];
+      const p = parseFloat(price);
+      if (p < 19) return row.costs[0];
+      if (p < 49) return row.costs[1];
+      if (p < 79) return row.costs[2];
+      if (p < 100) return row.costs[3];
+      if (p < 120) return row.costs[4];
+      if (p < 150) return row.costs[5];
+      if (p < 200) return row.costs[6];
+      return row.costs[7];
+    }
+
+    function updatePricingVars() {
+      const margin = document.getElementById('sim-margin').value;
+      if (margin) _atualizarPrecoVenda(margin);
+    }
+
+    function syncPriceInput(value) {
+      const price = parseFloat(value) || 0;
+      const cost = parseFloat(document.getElementById('sim-cost').value) || 0;
+      const weight = parseFloat(document.getElementById('sim-weight').value) || 0;
+      const isFreeShipping = document.getElementById('sim-free-shipping').checked;
+
+      if (price > 0 && cost > 0) {
+        const taxRates = { mei: 0.03, simples: 0.06, presumido: 0.08 };
+        const taxRate = taxRates[document.getElementById('sim-tax-regime').value] || 0.06;
+        const feeRates = { gold_pro: 0.19, gold_special: 0.14, free: 0 };
+        const feeRate = feeRates[document.getElementById('sim-listing-type').value] || 0.14;
+
+        let shipping = 0;
+        if (price >= 79 || isFreeShipping) {
+            shipping = estimateShipping(price, weight);
+        }
+
+        // Lucro = Preço - Custo - Frete - Taxa ML - Imposto
+        const profit = price - cost - shipping - (price * feeRate) - (price * taxRate);
+        const margin = (profit / price) * 100;
+
+        document.getElementById('sim-margin').value = margin.toFixed(1);
+        document.getElementById('sim-margin-range').value = margin.toFixed(1);
+      }
+    }
+
+    function _atualizarPrecoVenda(marginVal) {
+      const cost = parseFloat(document.getElementById('sim-cost').value) || 0;
+      const weight = parseFloat(document.getElementById('sim-weight').value) || 0;
+      const isFreeShipping = document.getElementById('sim-free-shipping').checked;
+      const margin = parseFloat(marginVal) / 100;
+
+      if (cost > 0 && margin < 1) {
+        const taxRates = { mei: 0.03, simples: 0.06, presumido: 0.08 };
+        const taxRate = taxRates[document.getElementById('sim-tax-regime').value] || 0.06;
+        const feeRates = { gold_pro: 0.19, gold_special: 0.14, free: 0 };
+        const feeRate = feeRates[document.getElementById('sim-listing-type').value] || 0.14;
+
+        const denominator = 1 - margin - feeRate - taxRate;
+        if (denominator <= 0) return; // Margem impossível com essas taxas e custos
+
+        let price = cost / denominator; 
+        // O frete no Mercado Livre sobe em "degraus" dependendo do preço. 
+        // Essa repetição encontra em qual degrau exato de preço de frete você cai.
+        for(let i=0; i<4; i++) {
+            let shipping = 0;
+            if (price >= 79 || isFreeShipping) {
+                shipping = estimateShipping(price, weight);
+            }
+            price = (cost + shipping) / denominator;
+        }
+
+        document.getElementById('sim-price').value = price.toFixed(2);
+      }
     }
 
     async function runSimulator() {
@@ -1735,27 +1799,17 @@
 
       let requiredPriceText = '—';
 
-      if (margin > 0) {
-        if (!cost || cost <= 0) {
-          showAlert('Carregue o custo do produto com o código para usar a margem.', 'warning');
-          return;
-        }
-        if (margin >= 100) {
-          showAlert('A margem deve ser menor que 100%.', 'warning');
-          return;
-        }
-        price = cost / (1 - margin / 100);
-        document.getElementById('sim-price').value = price.toFixed(2);
-        requiredPriceText = price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-        document.getElementById('sr-required-price-row').style.display = 'flex';
-      } else {
-        document.getElementById('sr-required-price-row').style.display = 'none';
-      }
-
-      if (!price || price <= 0) {
-        showAlert('Informe uma margem ou um preço válido.', 'warning');
+      if (!cost || cost <= 0) {
+        showAlert('Carregue o custo do produto informando o Código do Produto.', 'warning');
         return;
       }
+      if (margin >= 100) {
+        showAlert('A margem deve ser menor que 100%.', 'warning');
+        return;
+      }
+
+      requiredPriceText = price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      document.getElementById('sr-required-price-row').style.display = 'flex';
 
       document.getElementById('sr-required-price').textContent = requiredPriceText;
 
@@ -1931,6 +1985,10 @@
       statusSpan.textContent = '✅ Custo carregado do sistema';
       weightStatusSpan.style.color = 'var(--ml-success)';
       weightStatusSpan.textContent = '✅ Peso carregado do sistema';
+
+      // Atualiza o preço automaticamente com base no novo custo e na margem atual
+      const margemAtual = document.getElementById('sim-margin').value || 0;
+      if (typeof _atualizarPrecoVenda === 'function') _atualizarPrecoVenda(margemAtual);
 
     } catch (e) {
       statusSpan.style.color = 'var(--ml-danger)';

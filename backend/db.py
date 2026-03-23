@@ -6,7 +6,7 @@ load_dotenv()
 
 class DatabaseManager:
     def __init__(self):
-        self.use_sqlite = os.environ.get('USE_SQLITE', 'true').lower() == 'true'
+        self.use_sqlite = os.environ.get('USE_SQLITE', 'false').lower() == 'true'
         if self.use_sqlite:
             base_dir = os.path.dirname(os.path.abspath(__file__))
             default_db = os.path.join(base_dir, 'local_database.db')
@@ -25,6 +25,9 @@ class DatabaseManager:
         return sqlite3.connect(self.db_path)
 
     def _connect_firebird(self, database_path):
+        import locale
+        if not hasattr(locale, 'resetlocale'):
+            locale.resetlocale = lambda: None
         import fdb
         return fdb.connect(
             host=f"{self.host}/{self.port}",
