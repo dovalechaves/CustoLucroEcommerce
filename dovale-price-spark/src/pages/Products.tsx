@@ -1,8 +1,8 @@
 import { Link } from "react-router-dom";
 import dovaleLogo from "@/assets/dovale-logo.png";
-import MarketplaceCalculator from "@/components/MarketplaceCalculator";
+import ProductsTable from "@/components/ProductsTable";
 
-const Index = () => {
+const Products = () => {
   return (
     <div className="min-h-screen bg-background relative overflow-hidden">
       {/* Background blobs - Norris-inspired organic shapes */}
@@ -40,24 +40,23 @@ const Index = () => {
 
       {/* Hero */}
       <section className="relative z-10 px-6 md:px-12 pt-12 md:pt-20 pb-16 md:pb-24">
-        <div className="max-w-5xl mx-auto text-center mb-16 md:mb-20">
+        <div className="max-w-full mx-auto text-center mb-16 md:mb-20">
           <h1 className="font-display text-4xl md:text-6xl lg:text-7xl font-bold tracking-tight text-foreground leading-[0.95] text-balance animate-fade-up">
-            Calculadora de Preços
+            Listagem de Produtos
             <br />
-            <span className="text-primary/40">para Marketplaces</span>
+            <span className="text-primary/40">com Calculadora Integrada</span>
           </h1>
-          <p className="mt-6 text-base md:text-lg text-muted-foreground max-w-xl mx-auto animate-fade-up-delay-1 leading-relaxed">
-            Descubra suas taxas, custos e lucros de forma rápida e prática.
-            Ferramenta exclusiva <strong className="text-foreground font-semibold">DOVALE</strong>.
+          <p className="mt-6 text-base md:text-lg text-muted-foreground max-w-2xl mx-auto animate-fade-up-delay-1 leading-relaxed">
+            Visualize, edite e calcule preços de toda sua base de produtos em um único lugar.
           </p>
         </div>
 
-        <MarketplaceCalculator />
+        <ProductsTable />
       </section>
 
       {/* Footer */}
       <footer className="relative z-10 py-8 px-6 md:px-12 border-t border-border/50">
-        <div className="max-w-5xl mx-auto flex items-center justify-between">
+        <div className="max-w-full mx-auto flex items-center justify-between">
           <img src={dovaleLogo} alt="DOVALE" className="h-5 opacity-40" />
           <span className="text-xs text-muted-foreground/60">
             © {new Date().getFullYear()} DOVALE
@@ -68,4 +67,4 @@ const Index = () => {
   );
 };
 
-export default Index;
+export default Products;
