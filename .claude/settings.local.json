@@ -12,7 +12,10 @@
       "Bash(curl -s -X POST http://localhost:3001/auth/token -H \"Content-Type: application/json\" -d \"{\"\"access_token\"\":\"\"APP_USR-7759109179731764-032306-f6b73070091ca8f59de34636d00a1c92-159732894\"\"}\")",
       "Bash(curl -s \"http://localhost:3001/api/my-items?seller_id=159732894\" -H \"Authorization: Bearer APP_USR-7759109179731764-032306-f6b73070091ca8f59de34636d00a1c92-159732894\")",
       "Bash(curl -s \"http://localhost:3001/api/user?seller_id=159732894\" -H \"Authorization: Bearer APP_USR-7759109179731764-032306-f6b73070091ca8f59de34636d00a1c92-159732894\")",
-      "Bash(python app.py)"
+      "Bash(python app.py)",
+      "Bash(find . -maxdepth 2 -type f -name *.json -o -name *.yml -o -name *.yaml -o -name .env* -o -name docker* -o -name README*)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:raw.githubusercontent.com)"
     ]
   }
 }
