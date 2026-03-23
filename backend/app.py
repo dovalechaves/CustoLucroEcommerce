@@ -1,5 +1,6 @@
 import os
 import requests
+import pyodbc
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
@@ -66,6 +67,34 @@ def pegar_preco_frete(price, weight_grams):
     if p < 150: return row["costs"][5]
     if p < 200: return row["costs"][6]
     return row["costs"][7]
+
+@app.route('/api/token-salvo')
+def token_salvo():
+    try:
+        host = os.environ.get('SQLSERVER_HOST', '192.168.10.13')
+        port = os.environ.get('SQLSERVER_PORT', '1433')
+        db   = os.environ.get('SQLSERVER_DB', 'DOVALE')
+        user = os.environ.get('SQLSERVER_USER', 'sa')
+        pwd  = os.environ.get('SQLSERVER_PASS', '')
+        conn_str = (
+            f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+            f"SERVER={host},{port};DATABASE={db};"
+            f"UID={user};PWD={pwd};"
+            "TrustServerCertificate=yes;"
+        )
+        conn = pyodbc.connect(conn_str)
+        cursor = conn.cursor()
+        cursor.execute('SELECT TOP 1 TOKEN FROM TOKEN_FULL ORDER BY id DESC')
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row or not row[0]:
+            return jsonify({'error': 'Token não encontrado'}), 404
+
+        return jsonify({'token': row[0]})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 
 @app.route('/auth/token', methods=['POST'])
 def auth_token():

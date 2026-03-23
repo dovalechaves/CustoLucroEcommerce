@@ -2,7 +2,14 @@
   "permissions": {
     "allow": [
       "Bash(npm install:*)",
-      "Bash(node --check server.js)"
+      "Bash(node --check server.js)",
+      "Bash(find /c/Projetos/EcomerceCustoLucro -type f \\\\\\(-name *.js -o -name *.py -o -name *.jsx -o -name *.tsx -o -name *.ts \\\\\\))",
+      "Bash(pip install:*)",
+      "Bash(powershell -Command \"Test-NetConnection -ComputerName 192.168.10.13 -Port 1433\")",
+      "Bash(python -c \"import pyodbc; print\\([x for x in pyodbc.drivers\\(\\) if ''SQL'' in x]\\)\")",
+      "Bash(python -c \"import pyodbc; print\\(''ok''\\)\")",
+      "Bash(curl -s http://localhost:3001/api/token-salvo)",
+      "Bash(curl -s -X POST http://localhost:3001/auth/token -H \"Content-Type: application/json\" -d \"{\"\"access_token\"\":\"\"APP_USR-7759109179731764-032306-f6b73070091ca8f59de34636d00a1c92-159732894\"\"}\")"
     ]
   }
 }

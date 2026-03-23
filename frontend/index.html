@@ -1180,16 +1180,42 @@
       if (sellerId) {
         showApp();
       } else {
-        showLogin();
+        autoLoginFromDB();
       }
 
       // Set default date range: last 30 days
       const today = new Date();
       const thirtyAgo = new Date();
       thirtyAgo.setDate(today.getDate() - 30);
-      document.getElementById('f-date-to').value = toDateInput(today);
-      document.getElementById('f-date-from').value = toDateInput(thirtyAgo);
+      const elTo = document.getElementById('f-date-to');
+      const elFrom = document.getElementById('f-date-from');
+      if (elTo) elTo.value = toDateInput(today);
+      if (elFrom) elFrom.value = toDateInput(thirtyAgo);
     })();
+
+    // ── Auto Login via DB ─────────────────────────────────────────────────────────
+    async function autoLoginFromDB() {
+      try {
+        const res = await fetch(`${API_BASE}/api/token-salvo`);
+        if (!res.ok) throw new Error('Token não encontrado no banco');
+        const { token } = await res.json();
+
+        const authRes = await fetch(`${API_BASE}/auth/token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ access_token: token })
+        });
+        const authData = await authRes.json();
+        if (!authRes.ok) throw new Error(authData.error || `HTTP ${authRes.status}`);
+
+        sellerId = String(authData.seller_id);
+        localStorage.setItem('ml_seller_id', sellerId);
+        localStorage.setItem('ml_access_token', token);
+        await showApp();
+      } catch (e) {
+        showLogin();
+      }
+    }
 
     // ── Auth ──────────────────────────────────────────────────────────────────────
     async function loginWithToken(event) {
@@ -1664,6 +1690,22 @@
       }
     }
 
+    function syncMarginMode() {
+      const mode = document.querySelector('input[name="sim-mode"]:checked')?.value || 'price';
+      const priceInput = document.getElementById('sim-price');
+      const marginInput = document.getElementById('sim-margin');
+      const marginRange = document.getElementById('sim-margin-range');
+      if (mode === 'margin') {
+        if (priceInput) { priceInput.disabled = true; priceInput.style.opacity = '0.5'; }
+        if (marginInput) { marginInput.disabled = false; marginInput.style.opacity = '1'; }
+        if (marginRange) { marginRange.disabled = false; }
+      } else {
+        if (priceInput) { priceInput.disabled = false; priceInput.style.opacity = '1'; }
+        if (marginInput) { marginInput.disabled = true; marginInput.style.opacity = '0.5'; }
+        if (marginRange) { marginRange.disabled = true; }
+      }
+    }
+
     function syncMarginSlider(value) {
       const marginInput = document.getElementById('sim-margin');
       marginInput.value = Number(value).toFixed(1);
@@ -1712,45 +1754,6 @@
       }
 
       document.getElementById('sr-required-price').textContent = requiredPriceText;
-
-      const margin = parseFloat(document.getElementById('sim-margin').value) || 0;
-      const qty = parseInt(document.getElementById('sim-qty').value) || 1;
-      const cost = parseFloat(document.getElementById('sim-cost').value) || 0;
-      const weight = parseInt(document.getElementById('sim-weight').value) || 0;
-      const isFreeShipping = document.getElementById('sim-free-shipping').checked;
-      const listingTypeId = document.getElementById('sim-listing-type').value;
-      const taxRegime = document.getElementById('sim-tax-regime').value;
-      const categoryId = document.getElementById('sim-category-id').value.trim();
-      const itemId = document.getElementById('sim-item-id').value.trim();
-
-      let requiredPriceText = '—';
-
-      if (mode === 'price') {
-        if (!price || price <= 0) {
-          showAlert('Informe um preço válido para calcular com base no preço.', 'warning');
-          return;
-        }
-      } else {
-        if (!margin || margin <= 0) {
-          showAlert('Informe uma margem válida para calcular o preço.', 'warning');
-          return;
-        }
-        if (!cost || cost <= 0) {
-          showAlert('Carregue o custo do produto com o código para poder usar a margem.', 'warning');
-          return;
-        }
-        if (margin >= 100) {
-          showAlert('A margem deve ser menor que 100%.', 'warning');
-          return;
-        }
-
-        price = cost / (1 - margin / 100);
-        document.getElementById('sim-price').value = price.toFixed(2);
-        requiredPriceText = price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-      }
-
-      document.getElementById('sr-required-price').textContent = requiredPriceText;
-      document.getElementById('sr-required-price-row').style.display = (mode === 'margin') ? 'flex' : 'none';
 
       const body = {
         price,
