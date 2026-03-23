@@ -15,7 +15,8 @@
       "Bash(python app.py)",
       "Bash(find . -maxdepth 2 -type f -name *.json -o -name *.yml -o -name *.yaml -o -name .env* -o -name docker* -o -name README*)",
       "WebFetch(domain:github.com)",
-      "WebFetch(domain:raw.githubusercontent.com)"
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(git rm:*)"
     ]
   }
 }

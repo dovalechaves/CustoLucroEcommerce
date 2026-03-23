@@ -77,5 +77,4 @@ class DatabaseManager:
         finally:
             conn.close()
 
-# Initialize database
 db = DatabaseManager()

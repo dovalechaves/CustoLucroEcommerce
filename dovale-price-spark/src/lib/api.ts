@@ -4,6 +4,7 @@ export interface Produto {
   pro_codigo: number;
   resumo: string;
   custo: number;
+  preco: number;
   peso: number;
 }
 
@@ -32,6 +33,21 @@ export async function fetchProduto(codigo: string): Promise<Produto> {
   const res = await fetch(`${API_URL}/api/produto/${encodeURIComponent(codigo)}`);
   if (!res.ok) throw new Error("Produto não encontrado");
   return res.json();
+}
+
+export async function fetchProdutos(): Promise<Produto[]> {
+  const res = await fetch(`${API_URL}/api/produtos`);
+  if (!res.ok) throw new Error("Erro ao carregar produtos");
+  return res.json();
+}
+
+export async function fetchMyItems(sellerId: string, token: string): Promise<any[]> {
+  const res = await fetch(`${API_URL}/api/my-items?seller_id=${sellerId}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!res.ok) throw new Error("Erro ao carregar anúncios");
+  const data = await res.json();
+  return data.items || [];
 }
 
 export async function fetchTokenSalvo(): Promise<{ token: string }> {

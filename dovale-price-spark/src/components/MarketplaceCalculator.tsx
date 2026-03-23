@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { fetchProduto, fetchTokenSalvo, authToken, simulate, type SimulateResults } from "@/lib/api";
+import { fetchProduto, fetchTokenSalvo, authToken, simulate, fetchMyItems, type SimulateResults } from "@/lib/api";
 
 type Marketplace = "" | "shopee" | "mercadolivre";
 type ListingType = "gold_pro" | "gold_special" | "free";
@@ -285,12 +285,9 @@ const MarketplaceCalculator = () => {
     if (!mlToken) return;
     setIsLoadingItems(true);
     try {
-      const sellerId = localStorage.getItem("ml_seller_id");
-      const res = await fetch(`http://localhost:3001/api/my-items?seller_id=${sellerId || ""}`, {
-        headers: { Authorization: `Bearer ${mlToken}` }
-      });
-      const data = await res.json();
-      setMyItemsList(data.items || []);
+      const sellerId = localStorage.getItem("ml_seller_id") || "";
+      const items = await fetchMyItems(sellerId, mlToken);
+      setMyItemsList(items);
     } catch (e) {
       console.error(e);
       alert("Erro ao carregar anúncios");

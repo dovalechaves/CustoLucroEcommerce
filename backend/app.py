@@ -6,9 +6,10 @@ from flask_cors import CORS
 from dotenv import load_dotenv
 load_dotenv()
 from db import db
+from buscar_produto import buscar_produtos_ecommerce
 
 app = Flask(__name__)
-CORS(app, supports_credentials=True)
+CORS(app, origins="*")
 
 ML_API = 'https://api.mercadolibre.com'
 
@@ -298,6 +299,15 @@ def api_produto(codigo):
         if not produto:
             return jsonify({'error': 'Produto não encontrado'}), 404
         return jsonify(produto)
+    except Exception as e:
+        import traceback
+        return jsonify({'error': 'Erro interno', 'detail': traceback.format_exc()}), 500
+
+@app.route('/api/produtos', methods=['GET'])
+def api_produtos():
+    try:
+        produtos = buscar_produtos_ecommerce()
+        return jsonify(produtos)
     except Exception as e:
         import traceback
         return jsonify({'error': 'Erro interno', 'detail': traceback.format_exc()}), 500

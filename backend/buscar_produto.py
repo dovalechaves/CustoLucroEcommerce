@@ -17,6 +17,20 @@ def buscar_produto(codigo):
     """
     return db.fetch_one(query, params=(codigo,))
 
+def buscar_produtos_ecommerce():
+    query = """
+        SELECT
+            pro.pro_codigo,
+            pro.pro_resumo            AS resumo,
+            t1.tbp_custo              AS custo,
+            t4.tbp_custo              AS preco,
+            pt.ptr_peso_embalagem     AS peso
+        FROM produtos pro
+        INNER JOIN tabelas_produtos t1 ON t1.tbp_pro_codigo = pro.pro_codigo AND t1.tbp_tab_codigo = 1
+        INNER JOIN tabelas_produtos t4 ON t4.tbp_pro_codigo = pro.pro_codigo AND t4.tbp_tab_codigo = 4
+        INNER JOIN produtos_tray pt    ON pt.ptr_pro_codigo  = pro.pro_codigo
+    """
+    return db.fetch_all(query)
 
 if __name__ == '__main__':
     try:

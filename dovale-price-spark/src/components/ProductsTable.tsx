@@ -1,5 +1,5 @@
 import { useState, useMemo, useCallback, useEffect } from "react";
-import { fetchProduto } from "@/lib/api";
+import { fetchProdutos } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -11,21 +11,46 @@ interface Product {
   precoFinal: number;
   custo: number;
   peso: number;
-  ddf: number;
-  mercadoLivre: number;
-  imposto: number;
 }
 
-const LISTING_FEES: Record<string, number> = {
+type Marketplace = "mercadolivre" | "amazon" | "shopee";
+type ListingType = "gold_pro" | "gold_special" | "free";
+type RegimeTributario = "mei" | "simples" | "presumido";
+
+const LISTING_FEES: Record<ListingType, number> = {
   gold_pro: 16.5,
   gold_special: 14,
   free: 0,
 };
 
-const REGIME_TAXES: Record<string, number> = {
+const LISTING_LABELS: Record<ListingType, string> = {
+  gold_pro: "Premium (16,5%)",
+  gold_special: "Clássico (14%)",
+  free: "Grátis (0%)",
+};
+
+const REGIME_TAXES: Record<RegimeTributario, number> = {
   mei: 3,
   simples: 6,
   presumido: 8,
+};
+
+const REGIME_LABELS: Record<RegimeTributario, string> = {
+  mei: "MEI (3%)",
+  simples: "Simples Nacional (6%)",
+  presumido: "Lucro Presumido (8%)",
+};
+
+const MARKETPLACE_LABELS: Record<Marketplace, string> = {
+  mercadolivre: "Mercado Livre",
+  amazon: "Amazon",
+  shopee: "Shopee",
+};
+
+const MARKETPLACE_FEES: Record<Marketplace, number> = {
+  mercadolivre: 16.5, // sobrescrito pelo listingType quando ML
+  amazon: 15,
+  shopee: 5,
 };
 
 const SHIPPING_TABLE_GREEN = [
@@ -40,12 +65,14 @@ const SHIPPING_TABLE_GREEN = [
   { max_weight: 9.0, costs: [6.85, 7.95, 9.15, 25.45, 28.55, 32.65, 35.75, 39.75] },
   { max_weight: 13.0, costs: [8.35, 9.65, 11.25, 41.25, 46.25, 52.95, 57.95, 64.35] },
   { max_weight: 17.0, costs: [8.35, 9.65, 11.25, 45.95, 51.55, 58.95, 64.55, 71.65] },
-  { max_weight: 30.0, costs: [8.35, 9.65, 11.25, 49.45, 55.45, 63.45, 69.45, 77.15] }
+  { max_weight: 30.0, costs: [8.35, 9.65, 11.25, 49.45, 55.45, 63.45, 69.45, 77.15] },
 ];
 
 function estimateShipping(price: number, weightGrams: number) {
   const weightKg = weightGrams / 1000.0;
-  const row = SHIPPING_TABLE_GREEN.find(r => weightKg <= r.max_weight) || SHIPPING_TABLE_GREEN[SHIPPING_TABLE_GREEN.length - 1];
+  const row =
+    SHIPPING_TABLE_GREEN.find((r) => weightKg <= r.max_weight) ||
+    SHIPPING_TABLE_GREEN[SHIPPING_TABLE_GREEN.length - 1];
   if (price < 19) return row.costs[0];
   if (price < 49) return row.costs[1];
   if (price < 79) return row.costs[2];
@@ -56,135 +83,119 @@ function estimateShipping(price: number, weightGrams: number) {
   return row.costs[7];
 }
 
+const selectClass =
+  "appearance-none bg-secondary border-0 rounded-lg px-4 py-3.5 text-sm font-medium text-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200 cursor-pointer w-full";
+const labelClass = "text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2 block";
+
+const ChevronIcon = () => (
+  <svg
+    className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none"
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+  >
+    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+  </svg>
+);
+
 const ProductsTable = () => {
-  const [products, setProducts] = useState<Product[]>([
-    {
-      codigo: "10550",
-      descricao: "CORRENTE ENCAPADA 5X500MM AMARELO",
-      percentualDesconto: 0,
-      precoFinal: 50,
-      custo: 15,
-      peso: 500,
-      ddf: 0,
-      mercadoLivre: 0,
-      imposto: 0,
-    },
-    {
-      codigo: "10551",
-      descricao: "CORRENTE ENCAPADA 5X1000MM VERMELHO",
-      percentualDesconto: 0,
-      precoFinal: 75,
-      custo: 20,
-      peso: 1000,
-      ddf: 0,
-      mercadoLivre: 0,
-      imposto: 0,
-    },
-  ]);
+  const [products, setProducts] = useState<Product[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
-  const [searchQuery, setSearchQuery] = useState("");
-  const [marginFilter, setMarginFilter] = useState<[number, number]>([0, 100]);
-  const [listingType] = useState("gold_pro");
-  const [regimeTributario] = useState("presumido");
-
-  const fees = LISTING_FEES[listingType];
-  const taxes = REGIME_TAXES[regimeTributario];
-
-  // Calculate all values for a product
-  const calculateProduct = useCallback((product: Product): Product => {
-    const custo = product.custo;
-    const precoFinal = product.precoFinal;
-    const percentualDesconto = product.percentualDesconto;
-    const peso = product.peso;
-
-    // RECEBIMENTO = PREÇO FINAL × (1 - % / 100)
-    const recebimento = precoFinal * (1 - percentualDesconto / 100);
-
-    // DDF (usando Shopee como referência, taxa de 5%)
-    const ddf = recebimento * 0.05;
-
-    // MERC. LIVRE (taxa de 16.5%)
-    const mercadoLivre = recebimento * 0.165;
-
-    // IMPOSTO (8% para Lucro Presumido)
-    const imposto = recebimento * 0.08;
-
-    // RECEBIMENTO TOTAL = RECEBIMENTO - DDF
-    const recebimentoTotal = recebimento - ddf;
-
-    // MARGEM = ((RECEBIMENTO TOTAL - CUSTO) / RECEBIMENTO TOTAL) * 100
-    const margem = recebimentoTotal > 0 ? ((recebimentoTotal - custo) / recebimentoTotal) * 100 : 0;
-
-    // MARGEM C/ IMPOSTO = ((RECEBIMENTO TOTAL - CUSTO - IMPOSTO) / RECEBIMENTO TOTAL) * 100
-    const margemComImposto = recebimentoTotal > 0 ? ((recebimentoTotal - custo - imposto) / recebimentoTotal) * 100 : 0;
-
-    return {
-      ...product,
-      ddf,
-      mercadoLivre,
-      imposto,
-    };
+  useEffect(() => {
+    setIsLoading(true);
+    fetchProdutos()
+      .then((data) => {
+        setProducts(
+          data.map((p) => ({
+            codigo: String(p.pro_codigo),
+            descricao: p.resumo,
+            percentualDesconto: 0,
+            precoFinal: p.preco ?? 0,
+            custo: p.custo ?? 0,
+            peso: p.peso ?? 0,
+          }))
+        );
+      })
+      .catch(() => setLoadError("Não foi possível carregar os produtos. Verifique se o backend está rodando."))
+      .finally(() => setIsLoading(false));
   }, []);
 
-  // Update product when values change
+  // Filters
+  const [searchQuery, setSearchQuery] = useState("");
+  const [marginFilter, setMarginFilter] = useState<[number, number]>([0, 100]);
+
+  // Marketplace filter
+  const [marketplace, setMarketplace] = useState<Marketplace>("mercadolivre");
+  const [listingType, setListingType] = useState<ListingType>("gold_pro");
+  const [regimeTributario, setRegimeTributario] = useState<RegimeTributario>("presumido");
+
+  // Effective fee based on marketplace
+  const effectiveFeeRate = useMemo(() => {
+    if (marketplace === "mercadolivre") return LISTING_FEES[listingType] / 100;
+    return MARKETPLACE_FEES[marketplace] / 100;
+  }, [marketplace, listingType]);
+
+  const taxRate = REGIME_TAXES[regimeTributario] / 100;
+
+  const getCalculatedValues = useCallback(
+    (product: Product) => {
+      const recebimento = product.precoFinal * (1 - product.percentualDesconto / 100);
+      const taxa = recebimento * effectiveFeeRate;
+
+      const frete =
+        marketplace === "mercadolivre" && recebimento >= 79
+          ? estimateShipping(recebimento, product.peso)
+          : 0;
+
+      const imposto = recebimento * taxRate;
+      const recebimentoTotal = recebimento - taxa - frete;
+      const margem = recebimento > 0 ? ((recebimentoTotal - product.custo) / recebimento) * 100 : 0;
+      const margemComImposto =
+        recebimento > 0 ? ((recebimentoTotal - product.custo - imposto) / recebimento) * 100 : 0;
+
+      return { recebimento, taxa, frete, imposto, recebimentoTotal, margem, margemComImposto };
+    },
+    [effectiveFeeRate, taxRate, marketplace]
+  );
+
   const updateProduct = useCallback((index: number, updates: Partial<Product>) => {
-    setProducts(prev => {
+    setProducts((prev) => {
       const updated = [...prev];
       updated[index] = { ...updated[index], ...updates };
-      updated[index] = calculateProduct(updated[index]);
       return updated;
     });
-  }, [calculateProduct]);
+  }, []);
 
-  // Filter products
   const filteredProducts = useMemo(() => {
-    return products.filter(product => {
-      const matchesSearch = 
+    return products.filter((product) => {
+      const matchesSearch =
         product.codigo.toLowerCase().includes(searchQuery.toLowerCase()) ||
         product.descricao.toLowerCase().includes(searchQuery.toLowerCase());
 
-      const recebimento = product.precoFinal * (1 - product.percentualDesconto / 100);
-      const ddf = recebimento * 0.05;
-      const recebimentoTotal = recebimento - ddf;
-      const imposto = recebimento * 0.08;
-      const margemComImposto = recebimentoTotal > 0 ? ((recebimentoTotal - product.custo - imposto) / recebimentoTotal) * 100 : 0;
-
-      const matchesMargin = margemComImposto >= marginFilter[0] && margemComImposto <= marginFilter[1];
+      const { margemComImposto } = getCalculatedValues(product);
+      const matchesMargin =
+        margemComImposto >= marginFilter[0] && margemComImposto <= marginFilter[1];
 
       return matchesSearch && matchesMargin;
     });
-  }, [products, searchQuery, marginFilter]);
+  }, [products, searchQuery, marginFilter, getCalculatedValues]);
 
-  // Get margin color badge
   const getMarginBadge = (margem: number) => {
     if (margem > 40) return <Badge className="bg-green-100 text-green-800">{margem.toFixed(1)}%</Badge>;
     if (margem >= 20) return <Badge className="bg-yellow-100 text-yellow-800">{margem.toFixed(1)}%</Badge>;
     return <Badge className="bg-red-100 text-red-800">{margem.toFixed(1)}%</Badge>;
   };
 
-  // Format currency
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-  // Get calculated values for display
-  const getCalculatedValues = (product: Product) => {
-    const recebimento = product.precoFinal * (1 - product.percentualDesconto / 100);
-    const ddf = recebimento * 0.05;
-    const mercadoLivre = recebimento * 0.165;
-    const imposto = recebimento * 0.08;
-    const recebimentoTotal = recebimento - ddf;
-    const margem = recebimentoTotal > 0 ? ((recebimentoTotal - product.custo) / recebimentoTotal) * 100 : 0;
-    const margemComImposto = recebimentoTotal > 0 ? ((recebimentoTotal - product.custo - imposto) / recebimentoTotal) * 100 : 0;
-
-    return {
-      recebimento,
-      ddf,
-      mercadoLivre,
-      imposto,
-      recebimentoTotal,
-      margem,
-      margemComImposto,
-    };
-  };
+  const taxaLabel =
+    marketplace === "mercadolivre"
+      ? `ML (${LISTING_FEES[listingType]}%)`
+      : marketplace === "amazon"
+        ? "Amazon (15%)"
+        : "Shopee (5%)";
 
   return (
     <div className="w-full max-w-full mx-auto animate-fade-up-delay-1">
@@ -193,54 +204,82 @@ const ProductsTable = () => {
           Tabela de Produtos
         </h2>
 
-        {/* Filters */}
-        <div className="space-y-4 mb-8">
+        {/* Filters — linha 1 */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+          {/* Busca */}
           <div>
-            <label className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2 block">
-              Buscar (Código ou Descrição)
-            </label>
+            <label className={labelClass}>Buscar</label>
             <Input
               type="text"
-              placeholder="Digite o código ou descrição..."
+              placeholder="Código ou descrição..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full bg-secondary border-0 rounded-lg px-4 py-3.5 text-sm font-medium text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200"
+              className="w-full bg-secondary border-0 rounded-lg px-4 py-3.5 text-sm"
             />
           </div>
 
+          {/* Marketplace */}
           <div>
-            <label className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2 block">
-              Margem c/ Imposto (%)
-            </label>
-            <div className="flex gap-2">
-              <Input
-                type="number"
-                placeholder="Mín"
-                value={marginFilter[0]}
-                onChange={(e) => setMarginFilter([parseFloat(e.target.value) || 0, marginFilter[1]])}
-                className="w-full bg-secondary border-0 rounded-lg px-4 py-3.5 text-sm font-medium text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200"
-              />
-              <Input
-                type="number"
-                placeholder="Máx"
-                value={marginFilter[1]}
-                onChange={(e) => setMarginFilter([marginFilter[0], parseFloat(e.target.value) || 100])}
-                className="w-full bg-secondary border-0 rounded-lg px-4 py-3.5 text-sm font-medium text-foreground placeholder:text-muted-foreground/50 focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200"
-              />
+            <label className={labelClass}>Marketplace</label>
+            <div className="relative">
+              <select
+                value={marketplace}
+                onChange={(e) => setMarketplace(e.target.value as Marketplace)}
+                className={selectClass}
+              >
+                {Object.entries(MARKETPLACE_LABELS).map(([v, l]) => (
+                  <option key={v} value={v}>{l}</option>
+                ))}
+              </select>
+              <ChevronIcon />
             </div>
           </div>
 
-          <Button
-            onClick={() => {
-              setSearchQuery("");
-              setMarginFilter([0, 100]);
-            }}
-            variant="outline"
-            className="w-full"
-          >
-            Resetar Filtros
-          </Button>
+          {/* Slicer Margem c/ Imposto */}
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <label className={labelClass}>Margem c/ Imposto</label>
+              <span className="text-sm font-bold text-primary tabular-nums">
+                {marginFilter[0]}% — {marginFilter[1]}%
+              </span>
+            </div>
+            <div className="relative h-6 flex items-center">
+              <div className="absolute w-full h-2 bg-secondary rounded-full" />
+              <div
+                className="absolute h-2 bg-primary rounded-full"
+                style={{
+                  left: `${marginFilter[0]}%`,
+                  right: `${100 - marginFilter[1]}%`,
+                }}
+              />
+              <input
+                type="range" min="0" max="100" step="1"
+                value={marginFilter[0]}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (v <= marginFilter[1]) setMarginFilter([v, marginFilter[1]]);
+                }}
+                className="absolute w-full h-2 appearance-none bg-transparent cursor-pointer accent-primary [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:shadow-md"
+              />
+              <input
+                type="range" min="0" max="100" step="1"
+                value={marginFilter[1]}
+                onChange={(e) => {
+                  const v = Number(e.target.value);
+                  if (v >= marginFilter[0]) setMarginFilter([marginFilter[0], v]);
+                }}
+                className="absolute w-full h-2 appearance-none bg-transparent cursor-pointer accent-primary [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-primary [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:shadow-md"
+              />
+            </div>
+            <div className="flex justify-between text-[10px] text-muted-foreground font-medium mt-1">
+              <span>0%</span>
+              <span>50%</span>
+              <span>100%</span>
+            </div>
+          </div>
         </div>
+
+
 
         {/* Table */}
         <div className="overflow-x-auto">
@@ -252,23 +291,25 @@ const ProductsTable = () => {
                 <th className="px-4 py-3 text-center font-semibold text-foreground text-xs uppercase tracking-wider">%</th>
                 <th className="px-4 py-3 text-right font-semibold text-foreground text-xs uppercase tracking-wider">Preço Final</th>
                 <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Recebimento</th>
-                <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">DDF</th>
-                <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Merc. Livre</th>
-                <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Custo</th>
-                <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Margem</th>
+                <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">{taxaLabel}</th>
+                {marketplace === "mercadolivre" && (
+                  <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Frete (est.)</th>
+                )}
                 <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Imposto</th>
-                <th className="px-4 py-3 text-right font-semibold text-foreground font-bold text-xs uppercase tracking-wider">Recebimento Total</th>
-                <th className="px-4 py-3 text-right font-semibold text-primary text-xs uppercase tracking-wider">Margem c/ Imposto</th>
+                <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Custo</th>
+                <th className="px-4 py-3 text-right font-semibold text-foreground text-xs uppercase tracking-wider font-bold">Rec. Total</th>
+                <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Margem</th>
+                <th className="px-4 py-3 text-right font-semibold text-primary text-xs uppercase tracking-wider">Margem c/ Imp.</th>
                 <th className="px-4 py-3 text-right font-semibold text-foreground text-xs uppercase tracking-wider">Peso</th>
               </tr>
             </thead>
             <tbody>
-              {filteredProducts.map((product, index) => {
+              {filteredProducts.map((product) => {
                 const values = getCalculatedValues(product);
-                const actualIndex = products.findIndex(p => p.codigo === product.codigo);
+                const actualIndex = products.findIndex((p) => p.codigo === product.codigo);
 
                 return (
-                  <tr key={index} className="border-b border-border/50 hover:bg-secondary/50 transition-colors">
+                  <tr key={product.codigo} className="border-b border-border/50 hover:bg-secondary/50 transition-colors">
                     <td className="px-4 py-3 text-foreground font-medium">{product.codigo}</td>
                     <td className="px-4 py-3 text-foreground text-sm max-w-xs truncate">{product.descricao}</td>
                     <td className="px-4 py-3">
@@ -279,7 +320,7 @@ const ProductsTable = () => {
                         step="0.01"
                         value={product.percentualDesconto}
                         onChange={(e) => updateProduct(actualIndex, { percentualDesconto: parseFloat(e.target.value) || 0 })}
-                        className="w-16 bg-secondary border-0 rounded px-2 py-1 text-sm text-center text-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200"
+                        className="w-16 bg-secondary border-0 rounded px-2 py-1 text-sm text-center text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </td>
                     <td className="px-4 py-3">
@@ -289,19 +330,19 @@ const ProductsTable = () => {
                         step="0.01"
                         value={product.precoFinal}
                         onChange={(e) => updateProduct(actualIndex, { precoFinal: parseFloat(e.target.value) || 0 })}
-                        className="w-24 bg-secondary border-0 rounded px-2 py-1 text-sm text-right text-foreground focus:outline-none focus:ring-2 focus:ring-primary transition-all duration-200"
+                        className="w-24 bg-secondary border-0 rounded px-2 py-1 text-sm text-right text-foreground focus:outline-none focus:ring-2 focus:ring-primary"
                       />
                     </td>
                     <td className="px-4 py-3 text-right text-muted-foreground">{fmt(values.recebimento)}</td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">{fmt(values.ddf)}</td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">{fmt(values.mercadoLivre)}</td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">{fmt(product.custo)}</td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">{values.margem.toFixed(1)}%</td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">{fmt(values.taxa)}</td>
+                    {marketplace === "mercadolivre" && (
+                      <td className="px-4 py-3 text-right text-muted-foreground">{fmt(values.frete)}</td>
+                    )}
                     <td className="px-4 py-3 text-right text-muted-foreground">{fmt(values.imposto)}</td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">{fmt(product.custo)}</td>
                     <td className="px-4 py-3 text-right font-bold text-foreground">{fmt(values.recebimentoTotal)}</td>
-                    <td className="px-4 py-3 text-right">
-                      {getMarginBadge(values.margemComImposto)}
-                    </td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">{values.margem.toFixed(1)}%</td>
+                    <td className="px-4 py-3 text-right">{getMarginBadge(values.margemComImposto)}</td>
                     <td className="px-4 py-3 text-right text-foreground">{(product.peso / 1000).toFixed(2)} kg</td>
                   </tr>
                 );
@@ -310,11 +351,25 @@ const ProductsTable = () => {
           </table>
         </div>
 
-        {filteredProducts.length === 0 && (
+        {isLoading && (
+          <div className="text-center py-12">
+            <p className="text-muted-foreground">Carregando produtos...</p>
+          </div>
+        )}
+        {loadError && !isLoading && (
+          <div className="text-center py-12">
+            <p className="text-destructive text-sm">{loadError}</p>
+          </div>
+        )}
+        {!isLoading && !loadError && filteredProducts.length === 0 && (
           <div className="text-center py-12">
             <p className="text-muted-foreground">Nenhum produto encontrado com os filtros aplicados</p>
           </div>
         )}
+
+        <p className="text-xs text-muted-foreground mt-4">
+          {filteredProducts.length} produto{filteredProducts.length !== 1 ? "s" : ""} exibido{filteredProducts.length !== 1 ? "s" : ""}
+        </p>
       </div>
     </div>
   );
