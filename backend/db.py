@@ -12,7 +12,7 @@ class DatabaseManager:
             default_db = os.path.join(base_dir, 'local_database.db')
             self.db_path = os.environ.get('SQLITE_DB_PATH', default_db)
         else:
-            # Firebird config
+
             self.host = os.environ.get('DATABASE_HOST', '192.168.10.37')
             self.port = int(os.environ.get('DATABASE_PORT', 3050))
             self.db_replica = os.environ.get('DATABASE_NAME', 'C:/Microsys/SJC/MsysIndustrial/dados/MSYSDADOS.FDB')
