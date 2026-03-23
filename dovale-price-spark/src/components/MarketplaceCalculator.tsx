@@ -12,13 +12,13 @@ const MARKETPLACE_LABELS: Record<Marketplace, string> = {
 };
 
 const LISTING_FEES: Record<ListingType, number> = {
-  gold_pro: 19,
+  gold_pro: 16.5,
   gold_special: 14,
   free: 0,
 };
 
 const LISTING_LABELS: Record<ListingType, string> = {
-  gold_pro: "Premium (19%)",
+  gold_pro: "Premium (16.5%)",
   gold_special: "Clássico (14%)",
   free: "Grátis (0%)",
 };
@@ -104,7 +104,6 @@ const MarketplaceCalculator = () => {
   const [quantidade, setQuantidade] = useState(1);
 
   // Specific items / attributes
-  const [freteGratis, setFreteGratis] = useState(true);
   const [categoriaId, setCategoriaId] = useState("");
   const [itemId, setItemId] = useState("");
   const [myItemsList, setMyItemsList] = useState<any[]>([]);
@@ -113,7 +112,7 @@ const MarketplaceCalculator = () => {
 
   // ML-specific
   const [listingType, setListingType] = useState<ListingType>("gold_pro");
-  const [regimeTributario, setRegimeTributario] = useState<RegimeTributario>("simples");
+  const [regimeTributario, setRegimeTributario] = useState<RegimeTributario>("presumido");
   const [pesoGramas, setPesoGramas] = useState("500");
 
   // Auth
@@ -164,15 +163,26 @@ const MarketplaceCalculator = () => {
           const feeRate = LISTING_FEES[listingType] / 100;
           const denominator = 1 - margin - feeRate - taxRate;
           if (denominator > 0) {
-            let price = cost / denominator;
+            const priceNoShipping = cost / denominator;
+
+            let priceWithShipping = Math.max(79, cost / denominator);
             for (let i = 0; i < 4; i++) {
-              let shipping = 0;
-              if (price >= 79 || freteGratis) {
-                shipping = estimateShipping(price, weight);
-              }
-              price = (cost + shipping) / denominator;
+              let ship = estimateShipping(priceWithShipping, weight);
+              priceWithShipping = (cost + ship) / denominator;
             }
-            setPrecoVenda(price.toFixed(2));
+
+            const validNo = priceNoShipping < 79;
+            const validWith = priceWithShipping >= 79;
+            const currentPrice = parseFloat(precoVenda) || 0;
+
+            let finalPrice = priceNoShipping;
+            if (validNo && validWith) {
+              finalPrice = currentPrice >= 79 ? priceWithShipping : priceNoShipping;
+            } else if (validWith) {
+              finalPrice = priceWithShipping;
+            }
+
+            setPrecoVenda(finalPrice.toFixed(2));
           }
         } else {
           const taxRate = (parseFloat(taxaPlataforma) || 0) / 100;
@@ -188,29 +198,29 @@ const MarketplaceCalculator = () => {
           const taxRate = REGIME_TAXES[regimeTributario] / 100;
           const feeRate = LISTING_FEES[listingType] / 100;
           let shipping = 0;
-          if (price >= 79 || freteGratis) shipping = estimateShipping(price, weight);
+          if (price >= 79) shipping = estimateShipping(price, weight);
           const profit = price - cost - shipping - (price * feeRate) - (price * taxRate);
-          setMargemLucro(Number(((profit / price) * 100).toFixed(1)));
+          setMargemLucro(Number(((profit / price) * 100).toFixed(2)));
         } else {
           const taxRate = (parseFloat(taxaPlataforma) || 0) / 100;
           const impostosRate = (parseFloat(impostos) || 0) / 100;
           const profit = price - cost - (price * taxRate) - (price * impostosRate);
-          setMargemLucro(Number(((profit / price) * 100).toFixed(1)));
+          setMargemLucro(Number(((profit / price) * 100).toFixed(2)));
         }
       }
     }
-  }, [custoProduto, isML, regimeTributario, listingType, freteGratis, pesoGramas, taxaPlataforma, impostos]);
+  }, [custoProduto, isML, regimeTributario, listingType, pesoGramas, taxaPlataforma, impostos]);
 
   // Keep values in sync when dependencies change
   useEffect(() => {
     syncValues(lastEdited, lastEdited === "margin" ? margemLucro : parseFloat(precoVenda) || 0);
-  }, [syncValues, lastEdited, margemLucro, precoVenda, custoProduto, pesoGramas, isML, listingType, regimeTributario, freteGratis, taxaPlataforma, impostos]);
+  }, [syncValues, lastEdited, margemLucro, precoVenda, custoProduto, pesoGramas, isML, listingType, regimeTributario, taxaPlataforma, impostos]);
 
   // Reset simulation when inputs change
   useEffect(() => {
     setMlSim(null);
     setSimErro(null);
-  }, [marketplace, custoProduto, listingType, regimeTributario, pesoGramas, freteGratis, margemLucro, precoVenda, quantidade]);
+  }, [marketplace, custoProduto, listingType, regimeTributario, pesoGramas, margemLucro, precoVenda, quantidade]);
 
   // Local calculation (always available)
   const results = useMemo(() => {
@@ -222,7 +232,7 @@ const MarketplaceCalculator = () => {
     if (isML) {
       const taxRate = REGIME_TAXES[regimeTributario] / 100;
       const feeRate = LISTING_FEES[listingType] / 100;
-      if (price >= 79 || freteGratis) {
+      if (price >= 79) {
         shipping = estimateShipping(price, parseInt(pesoGramas) || 0);
       }
       profit = price - cost - shipping - (price * feeRate) - (price * taxRate);
@@ -237,7 +247,7 @@ const MarketplaceCalculator = () => {
       lucroPorVenda: profit,
       frete: shipping,
     };
-  }, [precoVenda, custoProduto, taxaPlataforma, impostos, isML, listingType, regimeTributario, pesoGramas, freteGratis]);
+  }, [precoVenda, custoProduto, taxaPlataforma, impostos, isML, listingType, regimeTributario, pesoGramas]);
 
   const buscarProduto = async () => {
     if (!codigoProduto.trim()) return;
@@ -319,7 +329,7 @@ const MarketplaceCalculator = () => {
         listing_type_id: listingType,
         weight: parseInt(pesoGramas) || 500,
         tax_regime: regimeTributario,
-        free_shipping: freteGratis,
+        free_shipping: (parseFloat(precoVenda) || 0) >= 79,
       };
 
       if (categoriaId) payload.category_id = categoriaId;
@@ -522,7 +532,7 @@ const MarketplaceCalculator = () => {
                   type="number"
                   min="-100"
                   max="100"
-                  step="0.1"
+                step="0.01"
                   value={margemLucro}
                   onChange={(e) => {
                     setMargemLucro(Number(e.target.value));
@@ -537,7 +547,7 @@ const MarketplaceCalculator = () => {
               type="range"
               min="-100"
               max="100"
-              step="0.1"
+              step="0.01"
               value={margemLucro}
               onChange={(e) => {
                 setMargemLucro(Number(e.target.value));
@@ -593,18 +603,6 @@ const MarketplaceCalculator = () => {
           {/* O Resto: Frete, Categoria, Item ID */}
           {isML && (
             <>
-              <div className="space-y-2 mb-6">
-                <label className="flex items-center gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={freteGratis}
-                    onChange={(e) => setFreteGratis(e.target.checked)}
-                    className="w-5 h-5 rounded border-secondary text-primary focus:ring-primary"
-                  />
-                  <span className="text-sm font-medium text-foreground">Oferecer Frete Grátis</span>
-                </label>
-              </div>
-
               <div className="space-y-2 mb-6">
                 <label className={labelClass}>Categoria (Produto Inédito)</label>
                 <input

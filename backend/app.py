@@ -33,7 +33,7 @@ def format_ml_date(date_str):
 
 def get_fallback_rate(listing_type_id):
     rates = {
-        'gold_pro': 0.19,
+        'gold_pro': 0.165,
         'gold_special': 0.14,
         'free': 0.0
     }
