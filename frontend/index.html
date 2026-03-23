@@ -831,7 +831,7 @@
           onfocus="this.style.borderColor='var(--ml-blue)'"
           onblur="this.style.borderColor='var(--ml-gray2)'"></textarea>
       </div>
-      <button class="btn-primary" onclick="loginWithToken()">
+      <button class="btn-primary" onclick="loginWithToken(event)">
         <span>🔑</span> Entrar com Token
       </button>
 
@@ -845,124 +845,145 @@
   <div id="app-screen">
     <main>
 
-      <!-- Tabs -->
-      <div class="tabs">
-        <button class="tab-btn active" onclick="switchTab('orders')">📦 Pedidos</button>
-        <button class="tab-btn" onclick="switchTab('simulator')">🧮 Simulador</button>
-      </div>
+      <h2>🧮 Simulador de Lucro</h2>
+      <p style="margin-bottom:16px;">Use o código do produto para carregar custo e peso, e depois escolha modo de cálculo.</p>
 
-      <!-- ── ORDERS TAB ── -->
-      <div class="tab-content active" id="tab-orders">
-
-        <!-- Filters -->
+      <div class="tab-content active" id="tab-simulator">
         <div class="card">
-          <div class="card-title">🔍 Filtros</div>
-          <div class="filters-row">
-            <div class="filter-group">
-              <label>De</label>
-              <input type="date" id="f-date-from" />
+          <div class="card-title">🧮 Simulador de Lucro</div>
+          <p style="font-size:13px;color:var(--ml-gray3);margin-bottom:20px">
+            Calcule o lucro estimado antes de precificar seu produto.
+          </p>
+
+          <div style="margin-bottom:20px;">
+            <button class="btn-secondary" style="width:100%;margin-bottom:12px" onclick="loadMyItems(event)">☁️ Importar Meus Anúncios do Mercado Livre</button>
+            <select id="sim-my-items"
+              style="display:none;width:100%;border:1.5px solid var(--ml-gray2);border-radius:6px;padding:10px 12px;font-size:14px;outline:none;"
+              onchange="selectMyItem()">
+              <option value="">Selecione um anúncio para importar os dados...</option>
+            </select>
+          </div>
+
+          <div class="sim-form">
+            <div class="form-group">
+              <label>Código do Produto</label>
+              <input type="text" id="sim-product-code" placeholder="Ex: 17500" onblur="buscarCustoProduto(this.value)" />
+              <span id="sim-product-nome" style="font-size:12px;color:var(--ml-gray3);margin-top:4px;display:block"></span>
             </div>
-            <div class="filter-group">
-              <label>Até</label>
-              <input type="date" id="f-date-to" />
+
+            <div class="form-group">
+              <label>Preço de Venda (R$)</label>
+              <input type="number" id="sim-price" placeholder="0,00" min="0" step="0.01" />
             </div>
-            <div class="filter-group">
-              <label>Status</label>
-              <select id="f-status">
-                <option value="all">Todos</option>
-                <option value="paid">Pagos</option>
-                <option value="pending">Pendentes</option>
-                <option value="cancelled">Cancelados</option>
+
+            <div class="form-group">
+              <div style="display:flex;gap:14px;align-items:center;">
+                <label style="margin:0;">Margem de Lucro (%)</label>
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <input type="radio" name="sim-mode" id="sim-mode-price" value="price" checked onchange="syncMarginMode()" />
+                  <label for="sim-mode-price" style="margin:0;cursor:pointer;">Preço</label>
+                  <input type="radio" name="sim-mode" id="sim-mode-margin" value="margin" onchange="syncMarginMode()" />
+                  <label for="sim-mode-margin" style="margin:0;cursor:pointer;">Margem</label>
+                </div>
+              </div>
+              <input type="number" id="sim-margin" placeholder="Ex: 20" min="0" max="100" step="0.1" oninput="syncMarginSlider(this.value)" />
+              <input type="range" id="sim-margin-range" min="0" max="100" step="0.1" value="0" oninput="syncMarginInput(this.value)" />
+            </div>
+
+            <div class="form-group">
+              <label>Quantidade</label>
+              <input type="number" id="sim-qty" value="1" min="1" step="1" />
+            </div>
+
+            <div class="form-group">
+              <label>Custo do Produto (R$)</label>
+              <input type="number" id="sim-cost" placeholder="0,00" min="0" step="0.01" readonly style="background:#f0f0f0;cursor:not-allowed;color:#666" />
+              <span id="sim-cost-status" style="font-size:12px;margin-top:4px;display:block"></span>
+            </div>
+            <div class="form-group">
+              <label>Peso (gramas)</label>
+              <input type="number" id="sim-weight" placeholder="Ex: 500" min="0" step="1" value="500" readonly style="background:#f0f0f0;cursor:not-allowed;color:#666" />
+              <span id="sim-weight-status" style="font-size:12px;margin-top:4px;display:block"></span>
+            </div>
+            <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px;">
+              <input type="checkbox" id="sim-free-shipping" checked />
+              <label for="sim-free-shipping" style="cursor: pointer; margin: 0; padding-top: 2px;">Oferecer Frete Grátis</label>
+            </div>
+            <div class="form-group">
+              <label>Tipo de Anúncio</label>
+              <select id="sim-listing-type">
+                <option value="gold_premium">Premium (16%)</option>
+                <option value="gold_special" selected>Clássico (12%)</option>
+                <option value="free">Grátis (0%)</option>
               </select>
             </div>
-            <div class="filter-group">
+            <div class="form-group">
               <label>Regime Tributário</label>
-              <select id="f-tax-regime" onchange="recalcAllRows()">
+              <select id="sim-tax-regime">
                 <option value="simples">Simples Nacional (~6%)</option>
                 <option value="mei">MEI (~3%)</option>
                 <option value="presumido">Lucro Presumido (~8%)</option>
               </select>
             </div>
-            <div class="filter-group" style="justify-content:flex-end">
-              <label>&nbsp;</label>
-              <button class="btn-primary btn-sm" onclick="loadOrders(0)">
-                🔎 Buscar
-              </button>
+            <div class="form-group">
+              <label>Categoria (Produto Inédito)</label>
+              <input type="text" id="sim-category-id" placeholder="MLB1055" />
+            </div>
+            <div class="form-group">
+              <label>Item ID ML (opcional)</label>
+              <input type="text" id="sim-item-id" placeholder="MLB123456789" />
             </div>
           </div>
+
+          <div style="margin-top:20px">
+            <button class="btn-primary" style="max-width:220px" onclick="runSimulator()">▶ Calcular Lucro</button>
+          </div>
+
+          <!-- Simulator Result -->
+          <div class="sim-result" id="sim-result">
+            <h3>📊 Resultado da Simulação</h3>
+
+            <div class="progress-bar-wrap" id="sim-bar"></div>
+            <div class="legend" id="sim-legend"></div>
+
+            <div class="breakdown-bar">
+              <div class="breakdown-row">
+                <span>💰 Receita Bruta</span>
+                <span class="pos" id="sr-revenue">—</span>
+              </div>
+              <div class="breakdown-row">
+                <span>🏪 Taxa ML (<span id="sr-fee-pct">—</span>%)</span>
+                <span class="neg" id="sr-fee">—</span>
+              </div>
+              <div class="breakdown-row">
+                <span>🚚 Custo de Frete</span>
+                <span class="neg" id="sr-shipping">—</span>
+              </div>
+              <div class="breakdown-row">
+                <span>🧾 Imposto (<span id="sr-tax-pct">—</span>%)</span>
+                <span class="neg" id="sr-tax">—</span>
+              </div>
+              <div class="breakdown-row">
+                <span>📦 Custo do Produto</span>
+                <span class="neg" id="sr-cost">—</span>
+              </div>
+              <div class="breakdown-row">
+                <span>✅ Lucro Líquido</span>
+                <span id="sr-profit">—</span>
+              </div>
+              <div class="breakdown-row" id="sr-required-price-row" style="display:none;">
+                <span>💲 Preço necessário</span>
+                <span id="sr-required-price">—</span>
+              </div>
+              <div class="breakdown-row">
+                <span>📈 Margem</span>
+                <span id="sr-margin">—</span>
+              </div>
+            </div>
+          </div>
+
         </div>
-
-        <!-- Summary -->
-        <div class="summary-grid" id="summary-grid">
-          <div class="summary-card">
-            <div class="label">Total Receita</div>
-            <div class="value" id="s-revenue">R$ 0,00</div>
-          </div>
-          <div class="summary-card">
-            <div class="label">Total Taxas ML</div>
-            <div class="value" id="s-fees">R$ 0,00</div>
-          </div>
-          <div class="summary-card">
-            <div class="label">Total Custos Prod.</div>
-            <div class="value" id="s-costs">R$ 0,00</div>
-          </div>
-          <div class="summary-card">
-            <div class="label">Total Frete</div>
-            <div class="value" id="s-shipping">R$ 0,00</div>
-          </div>
-          <div class="summary-card">
-            <div class="label">Total Impostos</div>
-            <div class="value" id="s-taxes">R$ 0,00</div>
-          </div>
-          <div class="summary-card positive">
-            <div class="label">Lucro Total</div>
-            <div class="value" id="s-profit">R$ 0,00</div>
-          </div>
-          <div class="summary-card accent">
-            <div class="label">Margem Média</div>
-            <div class="value" id="s-margin">0,0%</div>
-          </div>
-        </div>
-
-        <!-- Orders Table -->
-        <div class="card">
-          <div class="table-wrapper">
-            <table id="orders-table">
-              <thead>
-                <tr>
-                  <th>Data</th>
-                  <th>Produto</th>
-                  <th>Qtd</th>
-                  <th>Status</th>
-                  <th class="number">Preço Venda</th>
-                  <th class="number">Taxa ML</th>
-                  <th class="number">Custo Produto</th>
-                  <th class="number">Frete</th>
-                  <th class="number">Imposto</th>
-                  <th class="number">Lucro</th>
-                  <th class="number">Margem%</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody id="orders-tbody">
-                <tr class="loading-row">
-                  <td colspan="12" style="text-align:center;padding:40px;color:#999">
-                    Use os filtros acima e clique em Buscar para carregar os pedidos.
-                  </td>
-                </tr>
-              </tbody>
-              <tfoot id="orders-tfoot">
-              </tfoot>
-            </table>
-          </div>
-
-          <!-- Pagination -->
-          <div class="pagination" id="pagination"></div>
-        </div>
-
-      </div><!-- /tab-orders -->
-
-      <!-- ── SIMULATOR TAB ── -->
+      </div><!-- /tab-simulator -->
       <div class="tab-content" id="tab-simulator">
         <div class="card">
           <div class="card-title">🧮 Simulador de Lucro</div>
@@ -982,24 +1003,44 @@
 
           <div class="sim-form">
             <div class="form-group">
+              <label>Código do Produto</label>
+              <input type="text" id="sim-product-code" placeholder="Ex: 17500" onblur="buscarCustoProduto(this.value)" />
+              <span id="sim-product-nome" style="font-size:12px;color:var(--ml-gray3);margin-top:4px;display:block"></span>
+            </div>
+
+            <div class="form-group">
               <label>Preço de Venda (R$)</label>
               <input type="number" id="sim-price" placeholder="0,00" min="0" step="0.01" />
             </div>
+
+            <div class="form-group">
+              <div style="display:flex;gap:14px;align-items:center;">
+                <label style="margin:0;">Margem de Lucro (%)</label>
+                <div style="display:flex;gap:8px;align-items:center;">
+                  <input type="radio" name="sim-mode" id="sim-mode-price" value="price" checked onchange="syncMarginMode()" />
+                  <label for="sim-mode-price" style="margin:0;cursor:pointer;">Preço</label>
+                  <input type="radio" name="sim-mode" id="sim-mode-margin" value="margin" onchange="syncMarginMode()" />
+                  <label for="sim-mode-margin" style="margin:0;cursor:pointer;">Margem</label>
+                </div>
+              </div>
+              <input type="number" id="sim-margin" placeholder="Ex: 20" min="0" max="100" step="0.1" oninput="syncMarginSlider(this.value)" />
+              <input type="range" id="sim-margin-range" min="0" max="100" step="0.1" value="0" oninput="syncMarginInput(this.value)" />
+            </div>
+
             <div class="form-group">
               <label>Quantidade</label>
               <input type="number" id="sim-qty" value="1" min="1" step="1" />
             </div>
-            <div class="form-group">
-              <label>Código do Produto</label>
-              <input type="text" id="sim-product-code" placeholder="Ex: 17500" />
-            </div>
+
             <div class="form-group">
               <label>Custo do Produto (R$)</label>
-              <input type="number" id="sim-cost" placeholder="0,00" min="0" step="0.01" />
+              <input type="number" id="sim-cost" placeholder="0,00" min="0" step="0.01" readonly style="background:#f0f0f0;cursor:not-allowed;color:#666" />
+              <span id="sim-cost-status" style="font-size:12px;margin-top:4px;display:block"></span>
             </div>
             <div class="form-group">
               <label>Peso (gramas)</label>
-              <input type="number" id="sim-weight" placeholder="Ex: 500" min="0" step="1" value="500" />
+              <input type="number" id="sim-weight" placeholder="Ex: 500" min="0" step="1" value="500" readonly style="background:#f0f0f0;cursor:not-allowed;color:#666" />
+              <span id="sim-weight-status" style="font-size:12px;margin-top:4px;display:block"></span>
             </div>
             <div class="form-group" style="flex-direction: row; align-items: center; gap: 8px;">
               <input type="checkbox" id="sim-free-shipping" checked />
@@ -1069,6 +1110,10 @@
               <div class="breakdown-row">
                 <span>✅ Lucro Líquido</span>
                 <span id="sr-profit">—</span>
+              </div>
+              <div class="breakdown-row" id="sr-required-price-row" style="display:none;">
+                <span>💲 Preço necessário</span>
+                <span id="sr-required-price">—</span>
               </div>
               <div class="breakdown-row">
                 <span>📈 Margem</span>
@@ -1147,7 +1192,7 @@
     })();
 
     // ── Auth ──────────────────────────────────────────────────────────────────────
-    async function loginWithToken() {
+    async function loginWithToken(event) {
       const token = document.getElementById('token-input').value.trim();
       if (!token) {
         showLoginError('Cole o access token antes de continuar.');
@@ -1218,6 +1263,7 @@
       document.getElementById('app-screen').style.display = 'block';
       document.getElementById('header-user').style.display = 'flex';
       await loadUser();
+      syncMarginMode();
     }
 
     async function loadUser() {
@@ -1618,8 +1664,20 @@
       }
     }
 
+    function syncMarginSlider(value) {
+      const marginInput = document.getElementById('sim-margin');
+      marginInput.value = Number(value).toFixed(1);
+      document.getElementById('sim-margin-range').value = value;
+    }
+
+    function syncMarginInput(value) {
+      const marginRange = document.getElementById('sim-margin-range');
+      marginRange.value = Number(value);
+    }
+
     async function runSimulator() {
-      const price = parseFloat(document.getElementById('sim-price').value) || 0;
+      let price = parseFloat(document.getElementById('sim-price').value) || 0;
+      const margin = parseFloat(document.getElementById('sim-margin').value) || 0;
       const qty = parseInt(document.getElementById('sim-qty').value) || 1;
       const cost = parseFloat(document.getElementById('sim-cost').value) || 0;
       const weight = parseInt(document.getElementById('sim-weight').value) || 0;
@@ -1629,10 +1687,70 @@
       const categoryId = document.getElementById('sim-category-id').value.trim();
       const itemId = document.getElementById('sim-item-id').value.trim();
 
-      if (!price) {
-        showAlert('Informe o preço de venda.', 'warning');
+      let requiredPriceText = '—';
+
+      if (margin > 0) {
+        if (!cost || cost <= 0) {
+          showAlert('Carregue o custo do produto com o código para usar a margem.', 'warning');
+          return;
+        }
+        if (margin >= 100) {
+          showAlert('A margem deve ser menor que 100%.', 'warning');
+          return;
+        }
+        price = cost / (1 - margin / 100);
+        document.getElementById('sim-price').value = price.toFixed(2);
+        requiredPriceText = price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+        document.getElementById('sr-required-price-row').style.display = 'flex';
+      } else {
+        document.getElementById('sr-required-price-row').style.display = 'none';
+      }
+
+      if (!price || price <= 0) {
+        showAlert('Informe uma margem ou um preço válido.', 'warning');
         return;
       }
+
+      document.getElementById('sr-required-price').textContent = requiredPriceText;
+
+      const margin = parseFloat(document.getElementById('sim-margin').value) || 0;
+      const qty = parseInt(document.getElementById('sim-qty').value) || 1;
+      const cost = parseFloat(document.getElementById('sim-cost').value) || 0;
+      const weight = parseInt(document.getElementById('sim-weight').value) || 0;
+      const isFreeShipping = document.getElementById('sim-free-shipping').checked;
+      const listingTypeId = document.getElementById('sim-listing-type').value;
+      const taxRegime = document.getElementById('sim-tax-regime').value;
+      const categoryId = document.getElementById('sim-category-id').value.trim();
+      const itemId = document.getElementById('sim-item-id').value.trim();
+
+      let requiredPriceText = '—';
+
+      if (mode === 'price') {
+        if (!price || price <= 0) {
+          showAlert('Informe um preço válido para calcular com base no preço.', 'warning');
+          return;
+        }
+      } else {
+        if (!margin || margin <= 0) {
+          showAlert('Informe uma margem válida para calcular o preço.', 'warning');
+          return;
+        }
+        if (!cost || cost <= 0) {
+          showAlert('Carregue o custo do produto com o código para poder usar a margem.', 'warning');
+          return;
+        }
+        if (margin >= 100) {
+          showAlert('A margem deve ser menor que 100%.', 'warning');
+          return;
+        }
+
+        price = cost / (1 - margin / 100);
+        document.getElementById('sim-price').value = price.toFixed(2);
+        requiredPriceText = price.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+      }
+
+      document.getElementById('sr-required-price').textContent = requiredPriceText;
+      document.getElementById('sr-required-price-row').style.display = (mode === 'margin') ? 'flex' : 'none';
 
       const body = {
         price,
@@ -1765,7 +1883,51 @@
       const main = document.querySelector('main') || document.body;
       main.prepend(div);
       setTimeout(() => div.remove(), 6000);
+    } 
+
+    // ── Busca custo do produto no sistema ─────────────────────────────────
+  async function buscarCustoProduto(codigo) {
+    codigo = (codigo || '').trim();
+    if (!codigo) return;
+
+    const costInput   = document.getElementById('sim-cost');
+    const weightInput = document.getElementById('sim-weight');
+    const nomeSpan    = document.getElementById('sim-product-nome');
+    const statusSpan  = document.getElementById('sim-cost-status');
+    const weightStatusSpan = document.getElementById('sim-weight-status');
+
+    statusSpan.style.color = '#999';
+    statusSpan.textContent = '⏳ Buscando...';
+    nomeSpan.textContent   = '';
+    costInput.value        = '';
+    weightInput.value      = '';
+    weightStatusSpan.style.color = '#999';
+    weightStatusSpan.textContent = '';
+
+    try {
+      const res  = await fetch(`/api/produto/${encodeURIComponent(codigo)}`);
+      const data = await res.json();
+
+      if (!res.ok || data.error) {
+        statusSpan.style.color = 'var(--ml-danger)';
+        statusSpan.textContent = '❌ Produto não encontrado';
+        return;
+      }
+
+      costInput.value        = data.custo.toFixed(2);
+      weightInput.value      = data.peso;
+      nomeSpan.textContent   = data.resumo;
+      statusSpan.style.color = 'var(--ml-success)';
+      statusSpan.textContent = '✅ Custo carregado do sistema';
+      weightStatusSpan.style.color = 'var(--ml-success)';
+      weightStatusSpan.textContent = '✅ Peso carregado do sistema';
+
+    } catch (e) {
+      statusSpan.style.color = 'var(--ml-danger)';
+      statusSpan.textContent = '❌ Erro ao conectar com o servidor';
     }
+  }
+
   </script>
 </body>
 

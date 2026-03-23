@@ -35,8 +35,6 @@ class FirebirdManager:
             cursor = conn.cursor()
             cursor.execute(query, params or ())
             columns = [desc[0] for desc in cursor.description]
-            
-            # Mapeando os resultados [{coluna: valor}, ...]
             results = [dict(zip(columns, row)) for row in cursor.fetchall()]
             return results
         finally:
@@ -47,14 +45,25 @@ class FirebirdManager:
         try:
             cursor = conn.cursor()
             cursor.execute(query, params or ())
-            
             row = cursor.fetchone()
             if not row:
                 return None
-                
             columns = [desc[0] for desc in cursor.description]
             return dict(zip(columns, row))
         finally:
             conn.close()
+
+    # ✅ SUA FUNÇÃO NOVA AQUI
+    def buscar_custo_produtos(self):
+        query = """
+            SELECT 
+                pro.pro_codigo, 
+                pro.pro_resumo, 
+                tp.tbp_custo
+            FROM produtos pro
+            INNER JOIN tabelas_produtos tp ON tp.tbp_pro_codigo = pro.pro_codigo
+            WHERE tp.tbp_tab_codigo = 1
+        """
+        return self.fetch_all(query)
 
 db = FirebirdManager()
