@@ -15,7 +15,8 @@ interface Product {
 
 type Marketplace = "mercadolivre" | "amazon" | "shopee";
 type ListingType = "gold_pro" | "gold_special" | "free";
-type RegimeTributario = "mei" | "simples" | "presumido";
+
+const TAX_RATE = 0.21; // 21% fixo
 
 const LISTING_FEES: Record<ListingType, number> = {
   gold_pro: 16.5,
@@ -27,18 +28,6 @@ const LISTING_LABELS: Record<ListingType, string> = {
   gold_pro: "Premium (16,5%)",
   gold_special: "Clássico (14%)",
   free: "Grátis (0%)",
-};
-
-const REGIME_TAXES: Record<RegimeTributario, number> = {
-  mei: 3,
-  simples: 6,
-  presumido: 8,
-};
-
-const REGIME_LABELS: Record<RegimeTributario, string> = {
-  mei: "MEI (3%)",
-  simples: "Simples Nacional (6%)",
-  presumido: "Lucro Presumido (8%)",
 };
 
 const MARKETPLACE_LABELS: Record<Marketplace, string> = {
@@ -129,15 +118,12 @@ const ProductsTable = () => {
   // Marketplace filter
   const [marketplace, setMarketplace] = useState<Marketplace>("mercadolivre");
   const [listingType, setListingType] = useState<ListingType>("gold_pro");
-  const [regimeTributario, setRegimeTributario] = useState<RegimeTributario>("presumido");
 
   // Effective fee based on marketplace
   const effectiveFeeRate = useMemo(() => {
     if (marketplace === "mercadolivre") return LISTING_FEES[listingType] / 100;
     return MARKETPLACE_FEES[marketplace] / 100;
   }, [marketplace, listingType]);
-
-  const taxRate = REGIME_TAXES[regimeTributario] / 100;
 
   const getCalculatedValues = useCallback(
     (product: Product) => {
@@ -149,7 +135,7 @@ const ProductsTable = () => {
           ? estimateShipping(recebimento, product.peso)
           : 0;
 
-      const imposto = recebimento * taxRate;
+      const imposto = recebimento * TAX_RATE;
       const recebimentoTotal = recebimento - taxa - frete;
       const margem = recebimento > 0 ? ((recebimentoTotal - product.custo) / recebimento) * 100 : 0;
       const margemComImposto =
@@ -157,7 +143,7 @@ const ProductsTable = () => {
 
       return { recebimento, taxa, frete, imposto, recebimentoTotal, margem, margemComImposto };
     },
-    [effectiveFeeRate, taxRate, marketplace]
+    [effectiveFeeRate, marketplace]
   );
 
   const updateProduct = useCallback((index: number, updates: Partial<Product>) => {
@@ -295,7 +281,7 @@ const ProductsTable = () => {
                 {marketplace === "mercadolivre" && (
                   <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Frete (est.)</th>
                 )}
-                <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Imposto</th>
+                <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Imposto (21%)</th>
                 <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Custo</th>
                 <th className="px-4 py-3 text-right font-semibold text-foreground text-xs uppercase tracking-wider font-bold">Rec. Total</th>
                 <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Margem</th>
