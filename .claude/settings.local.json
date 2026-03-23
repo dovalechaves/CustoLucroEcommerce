@@ -10,7 +10,8 @@
       "Bash(python -c \"import pyodbc; print\\(''ok''\\)\")",
       "Bash(curl -s http://localhost:3001/api/token-salvo)",
       "Bash(curl -s -X POST http://localhost:3001/auth/token -H \"Content-Type: application/json\" -d \"{\"\"access_token\"\":\"\"APP_USR-7759109179731764-032306-f6b73070091ca8f59de34636d00a1c92-159732894\"\"}\")",
-      "Bash(curl -s \"http://localhost:3001/api/my-items?seller_id=159732894\" -H \"Authorization: Bearer APP_USR-7759109179731764-032306-f6b73070091ca8f59de34636d00a1c92-159732894\")"
+      "Bash(curl -s \"http://localhost:3001/api/my-items?seller_id=159732894\" -H \"Authorization: Bearer APP_USR-7759109179731764-032306-f6b73070091ca8f59de34636d00a1c92-159732894\")",
+      "Bash(curl -s \"http://localhost:3001/api/user?seller_id=159732894\" -H \"Authorization: Bearer APP_USR-7759109179731764-032306-f6b73070091ca8f59de34636d00a1c92-159732894\")"
     ]
   }
 }
