@@ -1,0 +1,66 @@
+const API_URL = import.meta.env.VITE_API_URL || "http://localhost:3001";
+
+export interface Produto {
+  pro_codigo: number;
+  resumo: string;
+  custo: number;
+  peso: number;
+}
+
+export interface SimulateParams {
+  price: number;
+  cost?: number;
+  listing_type_id?: string;
+  weight?: number;
+  tax_regime?: string;
+  free_shipping?: boolean;
+}
+
+export interface SimulateResults {
+  gross_revenue: number;
+  ml_fee_percent: number;
+  ml_fee_amount: number;
+  shipping_cost: number;
+  tax_rate_percent: number;
+  tax_amount: number;
+  product_cost: number;
+  net_profit: number;
+  margin_percent: number;
+}
+
+export async function fetchProduto(codigo: string): Promise<Produto> {
+  const res = await fetch(`${API_URL}/api/produto/${encodeURIComponent(codigo)}`);
+  if (!res.ok) throw new Error("Produto não encontrado");
+  return res.json();
+}
+
+export async function fetchTokenSalvo(): Promise<{ token: string }> {
+  const res = await fetch(`${API_URL}/api/token-salvo`);
+  if (!res.ok) throw new Error("Token não disponível");
+  return res.json();
+}
+
+export async function authToken(token: string): Promise<{ seller_id: string; nickname: string }> {
+  const res = await fetch(`${API_URL}/auth/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ access_token: token }),
+  });
+  if (!res.ok) throw new Error("Token inválido");
+  return res.json();
+}
+
+export async function simulate(
+  params: SimulateParams,
+  token?: string
+): Promise<{ results: SimulateResults }> {
+  const headers: Record<string, string> = { "Content-Type": "application/json" };
+  if (token) headers["Authorization"] = `Bearer ${token}`;
+  const res = await fetch(`${API_URL}/api/simulate`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(params),
+  });
+  if (!res.ok) throw new Error("Erro na simulação");
+  return res.json();
+}
