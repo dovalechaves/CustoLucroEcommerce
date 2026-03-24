@@ -70,10 +70,10 @@ const ChevronIcon = () => (
   </svg>
 );
 
-const ResultRow = ({ label, value, accent }: { label: string; value: string; accent?: boolean }) => (
+const ResultRow = ({ label, value, accent, colorClass }: { label: string; value: string; accent?: boolean; colorClass?: string }) => (
   <div className="flex items-center justify-between py-1">
     <span className="text-sm text-muted-foreground">{label}</span>
-    <span className={`text-sm font-semibold tabular-nums ${accent ? "text-primary" : "text-foreground"}`}>
+    <span className={`text-sm font-semibold tabular-nums ${colorClass ? colorClass : accent ? "text-primary" : "text-foreground"}`}>
       {value}
     </span>
   </div>
@@ -87,9 +87,8 @@ const MarketplaceCalculator = () => {
   const [taxaPlataforma, setTaxaPlataforma] = useState("");
   
   // New calculation states
-  const [margemLucro, setMargemLucro] = useState(20);
   const [precoVenda, setPrecoVenda] = useState("");
-  const [lastEdited, setLastEdited] = useState<"margin" | "price">("margin");
+  const [desconto, setDesconto] = useState(0);
   const [quantidade, setQuantidade] = useState(1);
 
   // Specific items / attributes
@@ -137,82 +136,20 @@ const MarketplaceCalculator = () => {
       .finally(() => setIsLoadingToken(false));
   }, []);
 
-  // Local 2-way binding Math Sync
-  const syncValues = useCallback((source: "margin" | "price", value: number) => {
-    const cost = parseFloat(custoProduto) || 0;
-    const weight = parseInt(pesoGramas) || 0;
-
-    if (source === "margin") {
-      const margin = value / 100;
-      if (cost > 0 && margin < 1) {
-        if (isML) {
-          const taxRate = TAX_RATE;
-          const feeRate = LISTING_FEES[listingType] / 100;
-          const denominator = 1 - margin - feeRate - taxRate;
-          if (denominator > 0) {
-            const priceNoShipping = cost / denominator;
-
-            let priceWithShipping = Math.max(79, cost / denominator);
-            for (let i = 0; i < 4; i++) {
-              let ship = estimateShipping(priceWithShipping, weight);
-              priceWithShipping = (cost + ship) / denominator;
-            }
-
-            const validNo = priceNoShipping < 79;
-            const validWith = priceWithShipping >= 79;
-            const currentPrice = parseFloat(precoVenda) || 0;
-
-            let finalPrice = priceNoShipping;
-            if (validNo && validWith) {
-              finalPrice = currentPrice >= 79 ? priceWithShipping : priceNoShipping;
-            } else if (validWith) {
-              finalPrice = priceWithShipping;
-            }
-
-            setPrecoVenda(finalPrice.toFixed(2));
-          }
-        } else {
-          const taxRate = (parseFloat(taxaPlataforma) || 0) / 100;
-          const denominator = 1 - margin - taxRate - TAX_RATE;
-          if (denominator > 0) setPrecoVenda((cost / denominator).toFixed(2));
-        }
-      }
-    } else {
-      const price = value;
-      if (price > 0 && cost > 0) {
-        if (isML) {
-          const taxRate = TAX_RATE;
-          const feeRate = LISTING_FEES[listingType] / 100;
-          let shipping = 0;
-          if (price >= 79) shipping = estimateShipping(price, weight);
-          const profit = price - cost - shipping - (price * feeRate) - (price * taxRate);
-          setMargemLucro(Number(((profit / price) * 100).toFixed(2)));
-        } else {
-          const taxRate = (parseFloat(taxaPlataforma) || 0) / 100;
-          const profit = price - cost - (price * taxRate) - (price * TAX_RATE);
-          setMargemLucro(Number(((profit / price) * 100).toFixed(2)));
-        }
-      }
-    }
-  }, [custoProduto, isML, listingType, pesoGramas, taxaPlataforma]);
-
-  // Keep values in sync when dependencies change
-  useEffect(() => {
-    syncValues(lastEdited, lastEdited === "margin" ? margemLucro : parseFloat(precoVenda) || 0);
-  }, [syncValues, lastEdited, margemLucro, precoVenda, custoProduto, pesoGramas, isML, listingType, taxaPlataforma]);
-
   // Reset simulation when inputs change
   useEffect(() => {
     setMlSim(null);
     setSimErro(null);
-  }, [marketplace, custoProduto, listingType, pesoGramas, margemLucro, precoVenda, quantidade]);
+  }, [marketplace, custoProduto, listingType, pesoGramas, desconto, precoVenda, quantidade]);
 
   // Local calculation (always available)
   const results = useMemo(() => {
     const cost = parseFloat(custoProduto) || 0;
-    const price = parseFloat(precoVenda) || 0;
+    const basePrice = parseFloat(precoVenda) || 0;
+    const price = basePrice * (1 - desconto / 100);
     let profit = 0;
     let shipping = 0;
+    let calculatedMargin = 0;
 
     if (isML) {
       const taxRate = TAX_RATE;
@@ -221,17 +158,20 @@ const MarketplaceCalculator = () => {
         shipping = estimateShipping(price, parseInt(pesoGramas) || 0);
       }
       profit = price - cost - shipping - (price * feeRate) - (price * taxRate);
+      calculatedMargin = price > 0 ? (profit / price) * 100 : 0;
     } else {
       const taxRate = (parseFloat(taxaPlataforma) || 0) / 100;
       profit = price - cost - (price * taxRate) - (price * TAX_RATE);
+      calculatedMargin = price > 0 ? (profit / price) * 100 : 0;
     }
 
     return {
       valorFinal: price,
       lucroPorVenda: profit,
       frete: shipping,
+      margemCalculada: calculatedMargin,
     };
-  }, [precoVenda, custoProduto, taxaPlataforma, isML, listingType, pesoGramas]);
+  }, [precoVenda, desconto, custoProduto, taxaPlataforma, isML, listingType, pesoGramas]);
 
   const buscarProduto = async () => {
     if (!codigoProduto.trim()) return;
@@ -289,8 +229,7 @@ const MarketplaceCalculator = () => {
       setItemId(item.id);
       setCategoriaId(item.category_id || "");
       setPrecoVenda(String(item.price || 0));
-      setLastEdited("price");
-      syncValues("price", item.price || 0);
+      setDesconto(0); // Reseta o desconto ao carregar novo produto
 
       if (item.listing_type_id === "gold_pro" || item.listing_type_id === "gold_special" || item.listing_type_id === "free") {
         setListingType(item.listing_type_id as ListingType);
@@ -303,14 +242,16 @@ const MarketplaceCalculator = () => {
     setSimErro(null);
     try {
       const custo = parseFloat(custoProduto) || 0;
+      const basePrice = parseFloat(precoVenda) || 0;
+      const finalPrice = basePrice * (1 - desconto / 100);
       const payload: any = {
-        price: parseFloat(precoVenda) || 0,
+        price: finalPrice,
         cost: custo,
         quantity: quantidade,
         listing_type_id: listingType,
         weight: parseInt(pesoGramas) || 500,
         tax_rate: 21,
-        free_shipping: (parseFloat(precoVenda) || 0) >= 79,
+        free_shipping: finalPrice >= 79,
       };
 
       if (categoriaId) payload.category_id = categoriaId;
@@ -459,38 +400,32 @@ const MarketplaceCalculator = () => {
           </div>
 
 
-          {/* Preço de Venda */}
+          {/* Preço Base */}
           <div className="space-y-2 mb-6">
-            <label className={labelClass}>Preço de Venda (R$)</label>
+            <label className={labelClass}>Preço Base (R$)</label>
             <input
               type="number"
               min="0"
               step="0.01"
               value={precoVenda}
-              onChange={(e) => {
-                setPrecoVenda(e.target.value);
-                setLastEdited("price");
-              }}
+              onChange={(e) => setPrecoVenda(e.target.value)}
               placeholder="0,00"
               className={inputClass}
             />
           </div>
 
-          {/* Margem de Lucro */}
+          {/* Desconto */}
           <div className="space-y-3 mb-6">
             <div className="flex items-center justify-between">
-              <label className={labelClass}>Margem de Lucro</label>
+              <label className={labelClass}>Desconto Aplicado</label>
               <div className="flex items-center gap-2">
                 <input
                   type="number"
-                  min="-100"
+                  min="0"
                   max="100"
-                step="0.01"
-                  value={margemLucro}
-                  onChange={(e) => {
-                    setMargemLucro(Number(e.target.value));
-                    setLastEdited("margin");
-                  }}
+                  step="0.1"
+                  value={desconto}
+                  onChange={(e) => setDesconto(Number(e.target.value))}
                   className="w-20 bg-secondary border-0 rounded-lg px-2 py-1 text-sm font-medium text-right focus:ring-2 focus:ring-primary outline-none"
                 />
                 <span className="text-sm font-bold text-primary tabular-nums">%</span>
@@ -498,20 +433,28 @@ const MarketplaceCalculator = () => {
             </div>
             <input
               type="range"
-              min="-100"
+              min="0"
               max="100"
-              step="0.01"
-              value={margemLucro}
-              onChange={(e) => {
-                setMargemLucro(Number(e.target.value));
-                setLastEdited("margin");
-              }}
+              step="0.1"
+              value={desconto}
+              onChange={(e) => setDesconto(Number(e.target.value))}
               className="w-full h-2 rounded-full appearance-none cursor-pointer bg-secondary accent-primary"
             />
             <div className="flex justify-between text-[10px] text-muted-foreground font-medium">
-              <span>-100%</span>
+              <span>0%</span>
               <span>100%</span>
             </div>
+          </div>
+
+          {/* Preço de Venda com Desconto */}
+          <div className="space-y-2 mb-6">
+            <label className={labelClass}>Preço Final c/ Desconto (R$)</label>
+            <input
+              type="text"
+              readOnly
+              value={fmt((parseFloat(precoVenda) || 0) * (1 - desconto / 100))}
+              className={`${inputClass} opacity-70 cursor-not-allowed font-bold text-primary`}
+            />
           </div>
 
           {/* Quantidade */}
@@ -593,6 +536,8 @@ const MarketplaceCalculator = () => {
           <div className="space-y-5">
             <ResultRow label="Marketplace" value={marketplace ? MARKETPLACE_LABELS[marketplace] : "—"} />
             <ResultRow label="Custo do Produto" value={fmt(parseFloat(custoProduto) || 0)} />
+            <ResultRow label="Preço Base" value={fmt(parseFloat(precoVenda) || 0)} />
+            <ResultRow label="Desconto" value={`${desconto}%`} />
             <ResultRow label="Quantidade" value={String(quantidade)} />
 
             {isML ? (
@@ -609,7 +554,11 @@ const MarketplaceCalculator = () => {
               </>
             )}
 
-            <ResultRow label="Margem de Lucro" value={`${margemLucro}%`} />
+            <ResultRow 
+              label="Margem de Lucro Final" 
+              value={`${results.margemCalculada.toFixed(2)}%`} 
+              colorClass={results.margemCalculada >= 0 ? "text-[#00A650]" : "text-destructive"} 
+            />
 
             {/* Detalhamento real do ML */}
             {mlSim && (
