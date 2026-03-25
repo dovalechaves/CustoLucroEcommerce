@@ -25,4 +25,4 @@ COPY . .
 
 EXPOSE 3001
 
-CMD ["python", "app.py"]
+CMD ["sh", "-c", "gunicorn --bind 0.0.0.0:${PORT:-3001} --workers 2 --timeout 120 app:app"]

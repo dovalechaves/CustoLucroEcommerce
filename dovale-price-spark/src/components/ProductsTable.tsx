@@ -2,6 +2,7 @@ import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { fetchProdutos, fetchCustoOperacional, CustoOperacionalItem } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import * as XLSX from "xlsx";
 
 interface Product {
   codigo: string;
@@ -22,9 +23,66 @@ const MARKETPLACE_LABELS: Record<Marketplace, string> = {
 
 const MARKETPLACE_FEES: Record<Marketplace, number> = {
   mercadolivre: 16.5,
-  amazon: 15,
-  shopee: 5,
+  amazon: 11, // Ferragens e Construção
+  shopee: 0, // calculado via shopeeFee()
 };
+
+function shopeeFee(price: number): number {
+  if (price <= 79.99) return price * 0.20 + 4;
+  if (price <= 99.99) return price * 0.14 + 16;
+  if (price <= 199.99) return price * 0.14 + 20;
+  if (price <= 499.99) return price * 0.14 + 26;
+  return price * 0.14 + 26;
+}
+
+// Amazon DBA — colunas: <30 | 30-49.99 | 50-78.99 | 79-99.99 | 100-119.99 | 120-149.99 | 150-199.99 | >=200
+// null = sem cobertura DBA nessa faixa
+const AMAZON_SHIPPING_TABLE: { max_weight_g: number; costs: (number | null)[] }[] = [
+  { max_weight_g: 100,  costs: [null, null, null, 10.05, 12.05, 14.05, 15.05, 15.55] },
+  { max_weight_g: 200,  costs: [null, null, null, 10.45, 12.45, 14.45, 15.45, 16.05] },
+  { max_weight_g: 300,  costs: [null, null, null, 10.95, 12.95, 14.95, 15.95, 16.55] },
+  { max_weight_g: 400,  costs: [null, null, null, 11.45, 13.45, 15.45, 16.95, 17.15] },
+  { max_weight_g: 500,  costs: [null, null, null, 11.95, 13.95, 15.95, 17.05, 17.85] },
+  { max_weight_g: 750,  costs: [null, null, null, 12.05, 14.05, 16.05, 18.45, 18.55] },
+  { max_weight_g: 1000, costs: [null, null, null, 12.45, 14.45, 16.45, 19.05, 19.25] },
+  { max_weight_g: 1500, costs: [5.65, 5.85, 6.05, 12.95, 14.95, 16.95, 19.45, 20.35] },
+  { max_weight_g: 2000, costs: [null, null, null, 13.05, 15.05, 17.05, 19.95, 21.35] },
+  { max_weight_g: 3000, costs: [null, null, null, 14.05, 16.05, 18.05, 20.05, 22.35] },
+  { max_weight_g: 4000, costs: [null, null, null, 15.05, 17.05, 19.05, 21.95, 23.35] },
+  { max_weight_g: 5000, costs: [null, null, null, 16.05, 18.05, 20.05, 22.95, 24.35] },
+  { max_weight_g: 6000, costs: [null, null, null, 24.05, 27.05, 29.05, 30.05, 30.35] },
+  { max_weight_g: 7000, costs: [null, null, null, 25.05, 28.05, 30.05, 31.05, 33.35] },
+  { max_weight_g: 8000, costs: [null, null, null, 26.05, 29.05, 31.05, 32.05, 35.35] },
+  { max_weight_g: 9000, costs: [null, null, null, 27.05, 30.05, 32.05, 33.05, 37.35] },
+  { max_weight_g: 10000,costs: [null, null, null, 35.05, 40.05, 46.05, 51.05, 51.35] },
+];
+
+// Adicional por kg acima de 10kg (por faixa de preço)
+const AMAZON_ADDITIONAL_PER_KG = [null, null, null, 3.05, 3.05, 3.05, 3.50, 3.50];
+
+function amazonPriceColIndex(price: number): number {
+  if (price < 30)    return 0;
+  if (price < 50)    return 1;
+  if (price < 79)    return 2;
+  if (price < 100)   return 3;
+  if (price < 120)   return 4;
+  if (price < 150)   return 5;
+  if (price < 200)   return 6;
+  return 7;
+}
+
+function estimateAmazonShipping(price: number, weightGrams: number): number {
+  const col = amazonPriceColIndex(price);
+  const row = AMAZON_SHIPPING_TABLE.find((r) => weightGrams <= r.max_weight_g);
+  if (row) {
+    return row.costs[col] ?? 0;
+  }
+  // Acima de 10kg: tarifa de 9-10kg + adicional por kg excedente
+  const base = AMAZON_SHIPPING_TABLE[AMAZON_SHIPPING_TABLE.length - 1].costs[col] ?? 0;
+  const extra = AMAZON_ADDITIONAL_PER_KG[col] ?? 0;
+  const extraKg = Math.ceil((weightGrams - 10000) / 1000);
+  return base + extra * extraKg;
+}
 
 const SHIPPING_TABLE_GREEN = [
   { max_weight: 0.3, costs: [5.65, 6.55, 7.75, 12.35, 14.35, 16.45, 18.45, 20.95] },
@@ -133,12 +191,14 @@ const ProductsTable = () => {
   const getCalculatedValues = useCallback(
     (product: Product) => {
       const recebimento = product.precoFinal * (1 - product.percentualDesconto / 100);
-      const taxa = recebimento * effectiveFeeRate;
+      const taxa = marketplace === "shopee" ? shopeeFee(recebimento) : recebimento * effectiveFeeRate;
 
       const freteBase =
         marketplace === "mercadolivre" && recebimento >= 79
           ? estimateShipping(recebimento, product.peso)
-          : 0;
+          : marketplace === "amazon"
+            ? estimateAmazonShipping(recebimento, product.peso)
+            : 0;
       const frete = freteBase * (1 - descontoFrete / 100);
 
       const imposto = recebimento * taxRate;
@@ -149,7 +209,7 @@ const ProductsTable = () => {
       const lucro = recebimento - taxa - frete - imposto - custoReal;
 
       const margem = recebimento > 0 ? ((recebimento - taxa - frete - custoReal) / recebimento) * 100 : 0;
-      const margemComImposto = recebimento > 0 ? (lucro / recebimento) * 100 : 0;
+      const margemComImposto = custoReal > 0 ? (lucro / custoReal) * 100 : 0;
 
       return { recebimento, taxa, frete, imposto, custoReal, lucro, margem, margemComImposto };
     },
@@ -181,18 +241,64 @@ const ProductsTable = () => {
 
   const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+  const exportToExcel = () => {
+    const showFrete = marketplace === "mercadolivre" || marketplace === "amazon";
+    const headers = [
+      "Código", "Descrição", "% Desc", "Preço Final", "Preço c/ Desc",
+      `Taxa (${MARKETPLACE_LABELS[marketplace]})`,
+      ...(showFrete ? ["Frete (est.)"] : []),
+      "Imposto (21%)", "Custo", "Custo Op.", "Custo Real",
+      "Lucro R$", "Margem c/ Imp. (%)", "Peso (g)",
+    ];
+
+    const rows = filteredProducts.map((product) => {
+      const v = getCalculatedValues(product);
+      const custoOpUnit = custoOp[Number(product.codigo)]?.custo_operacional_unit ?? null;
+      return [
+        product.codigo,
+        product.descricao,
+        product.percentualDesconto,
+        product.precoFinal,
+        v.recebimento,
+        v.taxa,
+        ...(showFrete ? [v.frete] : []),
+        v.imposto,
+        product.custo,
+        custoOpUnit ?? "",
+        v.custoReal,
+        v.lucro,
+        parseFloat(v.margemComImposto.toFixed(2)),
+        product.peso,
+      ];
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Produtos");
+    XLSX.writeFile(wb, `produtos_${MARKETPLACE_LABELS[marketplace].toLowerCase().replace(" ", "_")}.xlsx`);
+  };
+
   const taxaLabel =
     marketplace === "mercadolivre"
-      ? `Taxa ML (Premium 16,5%)`
+      ? "Taxa ML (Premium 16,5%)"
       : marketplace === "amazon"
-        ? "Amazon (15%)"
-        : "Shopee (5%)";
+        ? "Amazon (11%)"
+        : "Shopee (14%~20% + fixo)";
 
   return (
     <div className="bg-card rounded-2xl p-8 shadow-sm">
-        <h2 className="font-display text-xl font-bold tracking-tight text-foreground mb-8 uppercase">
-          Tabela de Produtos
-        </h2>
+        <div className="flex items-center justify-between mb-8">
+          <h2 className="font-display text-xl font-bold tracking-tight text-foreground uppercase">
+            Tabela de Produtos
+          </h2>
+          <button
+            onClick={exportToExcel}
+            disabled={filteredProducts.length === 0}
+            className="px-4 py-2 bg-primary text-primary-foreground rounded-lg text-sm font-semibold hover:opacity-90 transition-opacity disabled:opacity-40"
+          >
+            Exportar Excel
+          </button>
+        </div>
 
         {/* Filters */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
@@ -276,7 +382,7 @@ const ProductsTable = () => {
                 <th className="px-4 py-3 text-right font-semibold text-foreground text-xs uppercase tracking-wider">Preço Final</th>
                 <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Preço</th>
                 <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">{taxaLabel}</th>
-                {marketplace === "mercadolivre" && (
+                {(marketplace === "mercadolivre" || marketplace === "amazon") && (
                   <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Frete (est.)</th>
                 )}
                 <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Imposto</th>
@@ -320,7 +426,7 @@ const ProductsTable = () => {
                     </td>
                     <td className="px-4 py-3 text-right text-muted-foreground">{fmt(values.recebimento)}</td>
                     <td className="px-4 py-3 text-right text-muted-foreground">{fmt(values.taxa)}</td>
-                    {marketplace === "mercadolivre" && (
+                    {(marketplace === "mercadolivre" || marketplace === "amazon") && (
                       <td className="px-4 py-3 text-right text-muted-foreground">{fmt(values.frete)}</td>
                     )}
                     <td className="px-4 py-3 text-right text-muted-foreground">{fmt(values.imposto)}</td>
