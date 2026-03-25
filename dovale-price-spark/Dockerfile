@@ -1,5 +1,4 @@
-### Stage 1: build
-FROM node:20-alpine AS builder
+FROM node:20-alpine
 
 WORKDIR /app
 
@@ -8,19 +7,11 @@ RUN npm ci
 
 COPY . .
 
-# URL do backend — sobrescreva no Coolify com a URL pública do backend
 ARG VITE_API_URL=http://localhost:3001
 ENV VITE_API_URL=$VITE_API_URL
 
-RUN npm run build
+RUN npm run build && npm install -g serve
 
-### Stage 2: serve com nginx
-FROM nginx:alpine
+EXPOSE 3000
 
-COPY --from=builder /app/dist /usr/share/nginx/html
-# Salva como template para substituição do $PORT em runtime
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-EXPOSE 80
-
-CMD ["nginx", "-g", "daemon off;"]
+CMD ["serve", "-s", "dist", "-l", "3000"]
