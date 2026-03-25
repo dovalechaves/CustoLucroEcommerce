@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect, useCallback } from "react";
-import { fetchProduto, fetchTokenSalvo, authToken, simulate, fetchMyItems, type SimulateResults } from "@/lib/api";
+import { fetchProduto, fetchTokenSalvo, authToken, simulate, fetchMyItems, fetchCustoOperacional, type SimulateResults } from "@/lib/api";
 
 type Marketplace = "" | "shopee" | "mercadolivre";
 type ListingType = "gold_pro" | "gold_special" | "free";
@@ -108,6 +108,10 @@ const MarketplaceCalculator = () => {
   const [tokenInput, setTokenInput] = useState("");
   const [isLoadingToken, setIsLoadingToken] = useState(false);
 
+  // Custo operacional do produto buscado
+  const [custoOpUnit, setCustoOpUnit] = useState<number | null>(null);
+  const [valorParticipacao] = useState(2000000);
+
   // Product search
   const [isLoadingProduto, setIsLoadingProduto] = useState(false);
   const [produtoNome, setProdutoNome] = useState<string | null>(null);
@@ -144,7 +148,8 @@ const MarketplaceCalculator = () => {
 
   // Local calculation (always available)
   const results = useMemo(() => {
-    const cost = parseFloat(custoProduto) || 0;
+    const custoBase = parseFloat(custoProduto) || 0;
+    const cost = custoBase + (custoOpUnit ?? 0);
     const basePrice = parseFloat(precoVenda) || 0;
     const price = basePrice * (1 - desconto / 100);
     let profit = 0;
@@ -171,19 +176,25 @@ const MarketplaceCalculator = () => {
       frete: shipping,
       margemCalculada: calculatedMargin,
     };
-  }, [precoVenda, desconto, custoProduto, taxaPlataforma, isML, listingType, pesoGramas]);
+  }, [precoVenda, desconto, custoProduto, custoOpUnit, taxaPlataforma, isML, listingType, pesoGramas]);
 
   const buscarProduto = async () => {
     if (!codigoProduto.trim()) return;
     setIsLoadingProduto(true);
     setProdutoErro(null);
     setProdutoNome(null);
+    setCustoOpUnit(null);
     try {
-      const data = await fetchProduto(codigoProduto);
+      const [data, custoOpData] = await Promise.all([
+        fetchProduto(codigoProduto),
+        fetchCustoOperacional(valorParticipacao),
+      ]);
       const custoFmt = Number(data.custo).toFixed(2);
       setCustoProduto(custoFmt);
       if (data.peso) setPesoGramas(String(data.peso));
       setProdutoNome(data.resumo);
+      const item = custoOpData[Number(codigoProduto)];
+      setCustoOpUnit(item?.custo_operacional_unit ?? null);
     } catch {
       setProdutoErro("Produto não encontrado");
     } finally {
@@ -374,13 +385,37 @@ const MarketplaceCalculator = () => {
               min="0"
               step="0.01"
               value={custoProduto}
-            readOnly
+              readOnly
               placeholder="0,00"
-            className={`${inputClass} opacity-70 cursor-not-allowed`}
+              className={`${inputClass} opacity-70 cursor-not-allowed`}
             />
             {custoProduto !== "" && (
               <p className="text-xs text-[#00A650] font-medium mt-1">✅ Custo importado do sistema</p>
             )}
+          </div>
+
+          {/* Custo Operacional */}
+          <div className="space-y-2 mb-6">
+            <label className={labelClass}>Custo Operacional (R$)</label>
+            <input
+              type="text"
+              readOnly
+              value={custoOpUnit != null ? fmt(custoOpUnit) : "—"}
+              placeholder="—"
+              className={`${inputClass} opacity-70 cursor-not-allowed`}
+            />
+          </div>
+
+          {/* Custo Real */}
+          <div className="space-y-2 mb-6">
+            <label className={`${labelClass} text-primary`}>Custo Real (R$)</label>
+            <input
+              type="text"
+              readOnly
+              value={custoProduto !== "" ? fmt((parseFloat(custoProduto) || 0) + (custoOpUnit ?? 0)) : "—"}
+              placeholder="—"
+              className={`${inputClass} opacity-70 cursor-not-allowed text-primary font-bold`}
+            />
           </div>
 
           <div className="space-y-2 mb-6">
@@ -536,6 +571,12 @@ const MarketplaceCalculator = () => {
           <div className="space-y-5">
             <ResultRow label="Marketplace" value={marketplace ? MARKETPLACE_LABELS[marketplace] : "—"} />
             <ResultRow label="Custo do Produto" value={fmt(parseFloat(custoProduto) || 0)} />
+            {custoOpUnit != null && (
+              <ResultRow label="Custo Operacional" value={fmt(custoOpUnit)} />
+            )}
+            {custoOpUnit != null && (
+              <ResultRow label="Custo Real" value={fmt((parseFloat(custoProduto) || 0) + custoOpUnit)} accent />
+            )}
             <ResultRow label="Preço Base" value={fmt(parseFloat(precoVenda) || 0)} />
             <ResultRow label="Desconto" value={`${desconto}%`} />
             <ResultRow label="Quantidade" value={String(quantidade)} />

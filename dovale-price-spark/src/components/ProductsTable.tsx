@@ -119,6 +119,7 @@ const ProductsTable = () => {
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [marketplace, setMarketplace] = useState<Marketplace>("mercadolivre");
+  const [descontoFrete, setDescontoFrete] = useState(0);
 
   const effectiveFeeRate = useMemo(() => {
     if (marketplace === "mercadolivre") {
@@ -134,10 +135,11 @@ const ProductsTable = () => {
       const recebimento = product.precoFinal * (1 - product.percentualDesconto / 100);
       const taxa = recebimento * effectiveFeeRate;
 
-      const frete =
+      const freteBase =
         marketplace === "mercadolivre" && recebimento >= 79
           ? estimateShipping(recebimento, product.peso)
           : 0;
+      const frete = freteBase * (1 - descontoFrete / 100);
 
       const imposto = recebimento * taxRate;
 
@@ -151,7 +153,7 @@ const ProductsTable = () => {
 
       return { recebimento, taxa, frete, imposto, custoReal, lucro, margem, margemComImposto };
     },
-    [effectiveFeeRate, marketplace, taxRate, custoOp]
+    [effectiveFeeRate, marketplace, taxRate, custoOp, descontoFrete]
   );
 
   const updateProduct = (index: number, updates: Partial<Product>) => {
@@ -193,7 +195,7 @@ const ProductsTable = () => {
         </h2>
 
         {/* Filters */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           {/* Busca */}
           <div>
             <label className={labelClass}>Buscar</label>
@@ -244,6 +246,20 @@ const ProductsTable = () => {
               step="100000"
               value={valorParticipacao}
               onChange={(e) => setValorParticipacao(parseFloat(e.target.value) || 2000000)}
+              className="w-full bg-secondary border-0 rounded-lg px-4 py-3.5 text-sm"
+            />
+          </div>
+
+          {/* Desconto no Frete */}
+          <div>
+            <label className={labelClass}>Desconto no Frete (%)</label>
+            <Input
+              type="number"
+              min="0"
+              max="100"
+              step="1"
+              value={descontoFrete}
+              onChange={(e) => setDescontoFrete(Math.min(100, Math.max(0, parseFloat(e.target.value) || 0)))}
               className="w-full bg-secondary border-0 rounded-lg px-4 py-3.5 text-sm"
             />
           </div>
