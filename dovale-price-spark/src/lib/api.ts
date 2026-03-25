@@ -80,3 +80,20 @@ export async function simulate(
   if (!res.ok) throw new Error("Erro na simulação");
   return res.json();
 }
+
+export interface CustoOperacionalItem {
+  perc_participacao: number;
+  valor_participacao_rateado: number;
+  qtd_media_mensal: number;
+  custo_operacional_unit: number | null;
+}
+
+export async function fetchCustoOperacional(
+  valorParticipacao: number
+): Promise<Record<number, CustoOperacionalItem>> {
+  const res = await fetch(
+    `${API_URL}/api/custo-operacional?valor_participacao=${valorParticipacao}`
+  );
+  if (!res.ok) throw new Error("Erro ao carregar custo operacional");
+  return res.json();
+}

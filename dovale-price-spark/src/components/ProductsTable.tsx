@@ -1,5 +1,5 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
-import { fetchProdutos } from "@/lib/api";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
+import { fetchProdutos, fetchCustoOperacional, CustoOperacionalItem } from "@/lib/api";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 
@@ -21,7 +21,7 @@ const MARKETPLACE_LABELS: Record<Marketplace, string> = {
 };
 
 const MARKETPLACE_FEES: Record<Marketplace, number> = {
-  mercadolivre: 16.5, // sobrescrito pelo listingType quando ML
+  mercadolivre: 16.5,
   amazon: 15,
   shopee: 5,
 };
@@ -76,6 +76,13 @@ const ProductsTable = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
+  // Custo operacional
+  const [custoOp, setCustoOp] = useState<Record<number, CustoOperacionalItem>>({});
+  const [custoOpError, setCustoOpError] = useState<string | null>(null);
+  const [valorParticipacao, setValorParticipacao] = useState(2000000);
+  const [custoOpLoading, setCustoOpLoading] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
     setIsLoading(true);
     fetchProdutos()
@@ -95,18 +102,32 @@ const ProductsTable = () => {
       .finally(() => setIsLoading(false));
   }, []);
 
+  // Busca custo operacional; re-executa com debounce quando valorParticipacao muda
+  useEffect(() => {
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(() => {
+      setCustoOpLoading(true);
+      setCustoOpError(null);
+      fetchCustoOperacional(valorParticipacao)
+        .then((data) => { setCustoOp(data); setCustoOpError(null); })
+        .catch((e: Error) => { setCustoOp({}); setCustoOpError(e.message); })
+        .finally(() => setCustoOpLoading(false));
+    }, 600);
+    return () => { if (debounceRef.current) clearTimeout(debounceRef.current); };
+  }, [valorParticipacao]);
+
   // Filters
   const [searchQuery, setSearchQuery] = useState("");
   const [marketplace, setMarketplace] = useState<Marketplace>("mercadolivre");
 
   const effectiveFeeRate = useMemo(() => {
     if (marketplace === "mercadolivre") {
-      return 0.165; // Fixo 16,5% para ML Premium
+      return 0.165;
     }
     return MARKETPLACE_FEES[marketplace] / 100;
   }, [marketplace]);
 
-  const taxRate = 0.21; // Fixo 21%
+  const taxRate = 0.21;
 
   const getCalculatedValues = useCallback(
     (product: Product) => {
@@ -119,15 +140,18 @@ const ProductsTable = () => {
           : 0;
 
       const imposto = recebimento * taxRate;
-      
-      const lucro = recebimento - taxa - frete - imposto - product.custo;
-      
-      const margem = recebimento > 0 ? ((recebimento - taxa - frete - product.custo) / recebimento) * 100 : 0;
+
+      const custoOpUnit = custoOp[Number(product.codigo)]?.custo_operacional_unit ?? 0;
+      const custoReal = product.custo + custoOpUnit;
+
+      const lucro = recebimento - taxa - frete - imposto - custoReal;
+
+      const margem = recebimento > 0 ? ((recebimento - taxa - frete - custoReal) / recebimento) * 100 : 0;
       const margemComImposto = recebimento > 0 ? (lucro / recebimento) * 100 : 0;
 
-      return { recebimento, taxa, frete, imposto, lucro, margem, margemComImposto };
+      return { recebimento, taxa, frete, imposto, custoReal, lucro, margem, margemComImposto };
     },
-    [effectiveFeeRate, marketplace, taxRate]
+    [effectiveFeeRate, marketplace, taxRate, custoOp]
   );
 
   const updateProduct = (index: number, updates: Partial<Product>) => {
@@ -168,8 +192,8 @@ const ProductsTable = () => {
           Tabela de Produtos
         </h2>
 
-        {/* Filters — linha 1 */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        {/* Filters */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           {/* Busca */}
           <div>
             <label className={labelClass}>Buscar</label>
@@ -200,6 +224,29 @@ const ProductsTable = () => {
               <ChevronIcon />
             </div>
           </div>
+
+          {/* Valor de Participação */}
+          <div>
+            <label className={labelClass}>
+              Valor de Participação (R$)
+              {custoOpLoading && (
+                <span className="ml-2 text-primary font-normal normal-case tracking-normal">calculando...</span>
+              )}
+              {custoOpError && (
+                <span className="ml-2 text-destructive font-normal normal-case tracking-normal" title={custoOpError}>
+                  erro ao carregar
+                </span>
+              )}
+            </label>
+            <Input
+              type="number"
+              min="1"
+              step="100000"
+              value={valorParticipacao}
+              onChange={(e) => setValorParticipacao(parseFloat(e.target.value) || 2000000)}
+              className="w-full bg-secondary border-0 rounded-lg px-4 py-3.5 text-sm"
+            />
+          </div>
         </div>
 
         {/* Table */}
@@ -218,8 +265,9 @@ const ProductsTable = () => {
                 )}
                 <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Imposto</th>
                 <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Custo</th>
+                <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Custo Op.</th>
+                <th className="px-4 py-3 text-right font-semibold text-primary text-xs uppercase tracking-wider">Custo Real</th>
                 <th className="px-4 py-3 text-right font-semibold text-foreground text-xs uppercase tracking-wider font-bold">Lucro R$</th>
-                <th className="px-4 py-3 text-right font-semibold text-muted-foreground text-xs uppercase tracking-wider">Margem</th>
                 <th className="px-4 py-3 text-right font-semibold text-primary text-xs uppercase tracking-wider">Margem c/ Imp.</th>
                 <th className="px-4 py-3 text-right font-semibold text-foreground text-xs uppercase tracking-wider">Peso</th>
               </tr>
@@ -261,10 +309,19 @@ const ProductsTable = () => {
                     )}
                     <td className="px-4 py-3 text-right text-muted-foreground">{fmt(values.imposto)}</td>
                     <td className="px-4 py-3 text-right text-muted-foreground">{fmt(product.custo)}</td>
+                    <td className="px-4 py-3 text-right text-muted-foreground">
+                      {(() => {
+                        const c = custoOp[Number(product.codigo)];
+                        if (!c || c.custo_operacional_unit == null) return <span>—</span>;
+                        return fmt(c.custo_operacional_unit);
+                      })()}
+                    </td>
+                    <td className="px-4 py-3 text-right font-medium text-primary">
+                      {fmt(values.custoReal)}
+                    </td>
                     <td className={`px-4 py-3 text-right font-bold ${values.lucro >= 0 ? "text-green-600" : "text-red-600"}`}>
                       {fmt(values.lucro)}
                     </td>
-                    <td className="px-4 py-3 text-right text-muted-foreground">{values.margem.toFixed(1)}%</td>
                     <td className="px-4 py-3 text-right">{getMarginBadge(values.margemComImposto)}</td>
                     <td className="px-4 py-3 text-right text-foreground">{product.peso} g</td>
                   </tr>

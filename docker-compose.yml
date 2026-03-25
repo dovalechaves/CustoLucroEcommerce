@@ -3,16 +3,32 @@ services:
     build: ./backend
     ports:
       - "3001:3001"
-    env_file:
-      - ./backend/.env
     restart: unless-stopped
+    environment:
+      PORT: 3001
+      USE_SQLITE: ${USE_SQLITE:-false}
+      # Firebird (ERP Microsys)
+      DATABASE_HOST: ${DATABASE_HOST:-192.168.10.37}
+      DATABASE_PORT: ${DATABASE_PORT:-3050}
+      DATABASE_NAME: ${DATABASE_NAME}
+      DATABASE_NAME_LOG: ${DATABASE_NAME_LOG}
+      DATABASE_USER: ${DATABASE_USER:-SYSDBA}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD}
+      DATABASE_CHARSET: ${DATABASE_CHARSET:-UTF8}
+      # SQL Server (token ML)
+      SQLSERVER_HOST: ${SQLSERVER_HOST:-192.168.10.13}
+      SQLSERVER_PORT: ${SQLSERVER_PORT:-1433}
+      SQLSERVER_DB: ${SQLSERVER_DB:-DOVALE}
+      SQLSERVER_USER: ${SQLSERVER_USER:-sa}
+      SQLSERVER_PASS: ${SQLSERVER_PASS}
+      SQLSERVER_DB_BI: ${SQLSERVER_DB_BI:-DOVALE}
 
   frontend:
     build:
       context: ./dovale-price-spark
       args:
-        # Em produção, use a URL pública do backend (ex: https://api.seudominio.com)
-        VITE_API_URL: http://localhost:3001
+        # URL do backend acessível pelo browser do usuário
+        VITE_API_URL: ${VITE_API_URL:-http://192.168.10.39:3001}
     ports:
       - "8080:80"
     depends_on:

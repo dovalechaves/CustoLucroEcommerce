@@ -1,4 +1,5 @@
 import os
+import time
 import requests
 import pyodbc
 from flask import Flask, request, jsonify
@@ -10,6 +11,22 @@ from buscar_produto import buscar_produtos_ecommerce
 
 app = Flask(__name__)
 CORS(app, origins="*")
+
+# ── Cache em memória para custo operacional (TTL = 30 min) ──────────────────
+_custo_cache = {'base': None, 'ts': 0}
+_CUSTO_TTL = 1800  # segundos
+
+def _get_sqlserver_conn(database=None):
+    host = os.environ.get('SQLSERVER_HOST', '192.168.10.13')
+    port = os.environ.get('SQLSERVER_PORT', '1433')
+    db_name = database or os.environ.get('SQLSERVER_DB', 'DOVALE')
+    user = os.environ.get('SQLSERVER_USER', 'sa')
+    pwd  = os.environ.get('SQLSERVER_PASS', 'Elavod@2018@')
+    return pyodbc.connect(
+        f"DRIVER={{ODBC Driver 17 for SQL Server}};"
+        f"SERVER={host},{port};DATABASE={db_name};"
+        f"UID={user};PWD={pwd};TrustServerCertificate=yes;"
+    )
 
 ML_API = 'https://api.mercadolibre.com'
 
@@ -73,18 +90,7 @@ def pegar_preco_frete(price, weight_grams):
 @app.route('/api/token-salvo')
 def token_salvo():
     try:
-        host = os.environ.get('SQLSERVER_HOST', '192.168.10.13')
-        port = os.environ.get('SQLSERVER_PORT', '1433')
-        db   = os.environ.get('SQLSERVER_DB', 'DOVALE')
-        user = os.environ.get('SQLSERVER_USER', 'sa')
-        pwd  = os.environ.get('SQLSERVER_PASS', '')
-        conn_str = (
-            f"DRIVER={{ODBC Driver 17 for SQL Server}};"
-            f"SERVER={host},{port};DATABASE={db};"
-            f"UID={user};PWD={pwd};"
-            "TrustServerCertificate=yes;"
-        )
-        conn = pyodbc.connect(conn_str)
+        conn = _get_sqlserver_conn()
         cursor = conn.cursor()
         cursor.execute('SELECT TOP 1 TOKEN FROM TOKEN_FULL ORDER BY id DESC')
         row = cursor.fetchone()
@@ -96,6 +102,132 @@ def token_salvo():
         return jsonify({'token': row[0]})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+
+@app.route('/api/custo-operacional')
+def custo_operacional():
+    """
+    Retorna o custo operacional unitário por produto.
+    Baseia-se nos últimos 3 meses completos do calendário.
+    Aceita ?valor_participacao=2000000 (padrão).
+    Resultado em cache por 30 min — apenas o cálculo final varia com o parâmetro.
+    """
+    valor_participacao = float(request.args.get('valor_participacao', 2000000))
+
+    try:
+        # ── Recarrega base do SQL Server se cache expirou ──────────────────
+        if _custo_cache['base'] is None or (time.time() - _custo_cache['ts']) > _CUSTO_TTL:
+            bi_db = os.environ.get('SQLSERVER_DB_BI', 'DOVALE')
+            conn = _get_sqlserver_conn(bi_db)
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                DECLARE @D0 DATE = DATEADD(MONTH, DATEDIFF(MONTH,0,GETDATE())-3, 0);
+                DECLARE @D1 DATE = EOMONTH(GETDATE(),-1);
+
+                WITH
+                comercial AS (
+                    SELECT CODIGO AS PRO_CODIGO,
+                           SUM(VALORTOTAL)  AS VALOR_COMERCIAL,
+                           SUM(QTD)         AS QTD_TOTAL
+                    FROM [TI-COMERCIAL_62-ControleEP]
+                    WHERE DATA BETWEEN @D0 AND @D1
+                    GROUP BY CODIGO
+                ),
+                desconto AS (
+                    SELECT PRO_CODIGO,
+                           SUM(PRECO_DESCONTO) AS VALOR_DESCONTO,
+                           SUM(QTDE)           AS QTD_TOTAL
+                    FROM [TI-VENDAS_25-Desconto]
+                    WHERE PDV_DATA BETWEEN @D0 AND @D1
+                    GROUP BY PRO_CODIGO
+                ),
+                ecommerce AS (
+                    SELECT TRY_CAST(PRO_CODIGO AS INT) AS PRO_CODIGO,
+                           SUM(VALORTOTALITEM)         AS VALOR_ECOMMERCE,
+                           SUM(PVI_QUANTIDADE)         AS QTD_TOTAL
+                    FROM [TI-MARKETING_95-VendaEcommerce]
+                    WHERE EMP = 'FULL'
+                      AND PDV_DATA BETWEEN @D0 AND @D1
+                    GROUP BY TRY_CAST(PRO_CODIGO AS INT)
+                ),
+                todos AS (
+                    SELECT CODIGO AS PRO_CODIGO
+                    FROM [TI-COMERCIAL_62-ControleEP] WHERE DATA BETWEEN @D0 AND @D1
+                    UNION
+                    SELECT PRO_CODIGO
+                    FROM [TI-VENDAS_25-Desconto] WHERE PDV_DATA BETWEEN @D0 AND @D1
+                    UNION
+                    SELECT TRY_CAST(PRO_CODIGO AS INT)
+                    FROM [TI-MARKETING_95-VendaEcommerce]
+                    WHERE EMP = 'FULL' AND PDV_DATA BETWEEN @D0 AND @D1
+                      AND TRY_CAST(PRO_CODIGO AS INT) IS NOT NULL
+                ),
+                consolidado AS (
+                    SELECT
+                        t.PRO_CODIGO,
+                        COALESCE(c.VALOR_COMERCIAL,0)
+                            + COALESCE(d.VALOR_DESCONTO,0)
+                            + COALESCE(e.VALOR_ECOMMERCE,0)  AS VENDA_TOTAL,
+                        COALESCE(c.QTD_TOTAL,0)
+                            + COALESCE(d.QTD_TOTAL,0)
+                            + COALESCE(e.QTD_TOTAL,0)        AS QTD_TOTAL
+                    FROM todos t
+                    LEFT JOIN comercial c ON t.PRO_CODIGO = c.PRO_CODIGO
+                    LEFT JOIN desconto  d ON t.PRO_CODIGO = d.PRO_CODIGO
+                    LEFT JOIN ecommerce e ON t.PRO_CODIGO = e.PRO_CODIGO
+                ),
+                grand AS (
+                    SELECT SUM(VENDA_TOTAL) AS TOTAL FROM consolidado WHERE VENDA_TOTAL > 0
+                )
+                SELECT c.PRO_CODIGO,
+                       c.VENDA_TOTAL,
+                       c.QTD_TOTAL,
+                       g.TOTAL AS GRAND_TOTAL
+                FROM consolidado c
+                CROSS JOIN grand g
+                WHERE c.VENDA_TOTAL > 0
+            """)
+
+            rows = cursor.fetchall()
+            conn.close()
+
+            # Armazena dados base no cache (sem dependência de valor_participacao)
+            base = {}
+            for row in rows:
+                pro_codigo, venda_total, qtd_total, grand_total = row
+                if pro_codigo is None:
+                    continue
+                base[int(pro_codigo)] = {
+                    'venda_total':  float(venda_total  or 0),
+                    'qtd_total':    float(qtd_total    or 0),
+                    'grand_total':  float(grand_total  or 0),
+                }
+            _custo_cache['base'] = base
+            _custo_cache['ts'] = time.time()
+
+        # ── Aplica valor_participacao sobre o cache ────────────────────────
+        result = {}
+        for pro_codigo, item in _custo_cache['base'].items():
+            grand = item['grand_total']
+            if grand <= 0:
+                continue
+            perc = item['venda_total'] / grand          # 0..1
+            valor_rateado = perc * valor_participacao
+            qtd_media = item['qtd_total'] / 3.0
+            custo_unit = round(valor_rateado / qtd_media, 4) if qtd_media > 0 else None
+            result[pro_codigo] = {
+                'perc_participacao':        round(perc * 100, 4),
+                'valor_participacao_rateado': round(valor_rateado, 2),
+                'qtd_media_mensal':         round(qtd_media, 2),
+                'custo_operacional_unit':   custo_unit,
+            }
+
+        return jsonify(result)
+
+    except Exception as e:
+        import traceback
+        return jsonify({'error': str(e), 'detail': traceback.format_exc()}), 500
 
 
 @app.route('/auth/token', methods=['POST'])
