@@ -25,7 +25,7 @@ def _get_sqlserver_conn(database=None):
     return pyodbc.connect(
         f"DRIVER={{ODBC Driver 17 for SQL Server}};"
         f"SERVER={host},{port};DATABASE={db_name};"
-        f"UID={user};PWD={pwd};TrustServerCertificate=yes;"
+        f"UID={user};PWD={pwd};TrustServerCertificate=yes;Encrypt=no;"
     )
 
 ML_API = 'https://api.mercadolibre.com'
