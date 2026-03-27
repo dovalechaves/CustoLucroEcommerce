@@ -1,6 +1,6 @@
-import { Link } from "react-router-dom";
 import dovaleLogo from "@/assets/dovale-logo.png";
 import MarketplaceCalculator from "@/components/MarketplaceCalculator";
+import { NavLink } from "@/components/NavLink";
 
 const Index = () => {
   return (
@@ -28,13 +28,22 @@ const Index = () => {
       {/* Header */}
       <header className="relative z-10 flex items-center justify-between px-6 md:px-12 py-6 animate-fade-up">
         <img src={dovaleLogo} alt="DOVALE" className="h-8 md:h-10" />
-        <nav className="flex items-center gap-6">
-          <Link to="/" className="text-xs font-semibold uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground transition-colors">
+        <nav className="flex items-center gap-2">
+          <NavLink
+            to="/"
+            end
+            className="text-xs font-semibold uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md"
+            activeClassName="text-primary bg-primary/10 hover:text-primary"
+          >
             Calculadora
-          </Link>
-          <Link to="/produtos" className="text-xs font-semibold uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground transition-colors">
+          </NavLink>
+          <NavLink
+            to="/produtos"
+            className="text-xs font-semibold uppercase tracking-[0.25em] text-muted-foreground hover:text-foreground transition-colors px-3 py-1.5 rounded-md"
+            activeClassName="text-primary bg-primary/10 hover:text-primary"
+          >
             Produtos
-          </Link>
+          </NavLink>
         </nav>
       </header>
 
